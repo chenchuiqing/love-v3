@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import PhaseOne from './components/PhaseOne.vue';
+import PhaseTwo from './components/PhaseTwo.vue';
 
 const currentPhase = ref(1);
 
@@ -25,10 +26,15 @@ const handlePhaseOneComplete = () => {
       />
     </Transition>
     
-    <!-- 占位：第二阶段 -->
-    <div v-if="currentPhase === 2" class="phase-two-placeholder">
-      <h1>记忆星球（开发中...）</h1>
-    </div>
+    <!-- 第二阶段：记忆星球 -->
+    <Transition
+      enter-active-class="transition-opacity duration-1000"
+      leave-active-class="transition-opacity duration-1000"
+      enter-from-class="opacity-0"
+      leave-to-class="opacity-0"
+    >
+      <PhaseTwo v-if="currentPhase === 2" />
+    </Transition>
   </main>
 </template>
 
@@ -52,19 +58,5 @@ body,
   overflow: hidden;
 }
 
-.phase-two-placeholder {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  background: radial-gradient(circle at 50% 50%, #0a1f3d 0%, #000010 65%);
-}
-
-.phase-two-placeholder h1 {
-  font-size: clamp(1.2rem, 2.2vw, 2rem);
-  font-weight: 300;
-  letter-spacing: 0.22em;
-  text-shadow: 0 0 18px rgba(137, 197, 255, 0.45);
-}
 </style>
 
