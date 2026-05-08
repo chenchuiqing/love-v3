@@ -9,7 +9,6 @@ const emit = defineEmits<{
 
 const rootRef = ref<HTMLElement | null>(null);
 const containerRef = ref<HTMLElement | null>(null);
-const isFullscreen = ref(false);
 
 let scene: THREE.Scene;
 let camera: THREE.PerspectiveCamera;
@@ -236,23 +235,6 @@ const onWindowResize = () => {
   renderer.setSize(width, height);
 };
 
-const syncFullscreenState = () => {
-  isFullscreen.value = document.fullscreenElement === rootRef.value;
-  onWindowResize();
-};
-
-const toggleFullscreen = async () => {
-  if (!rootRef.value) return;
-  try {
-    if (document.fullscreenElement) {
-      await document.exitFullscreen();
-    } else {
-      await rootRef.value.requestFullscreen();
-    }
-  } catch (error) {
-    console.warn('全屏切换失败', error);
-  }
-};
 
 const animate = () => {
   animationFrameId = requestAnimationFrame(animate);
@@ -348,12 +330,10 @@ const handlePointerOut = () => {
 onMounted(() => {
   initScene();
   animate();
-  document.addEventListener('fullscreenchange', syncFullscreenState);
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', onWindowResize);
-  document.removeEventListener('fullscreenchange', syncFullscreenState);
   if (animationFrameId) {
     cancelAnimationFrame(animationFrameId);
   }
@@ -385,10 +365,6 @@ onBeforeUnmount(() => {
     @contextmenu.prevent
   >
     <div ref="containerRef" class="canvas-layer"></div>
-
-    <button class="fullscreen-button" @pointerdown.stop @click.stop="toggleFullscreen">
-      {{ isFullscreen ? '退出全屏' : '进入全屏' }}
-    </button>
     
     <!-- UI 提示层 -->
     <div 
@@ -420,29 +396,6 @@ onBeforeUnmount(() => {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-}
-
-.fullscreen-button {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  z-index: 20;
-  padding: 0.45rem 0.8rem;
-  border: 1px solid rgba(163, 218, 255, 0.45);
-  border-radius: 999px;
-  background: rgba(4, 20, 48, 0.55);
-  color: rgba(236, 247, 255, 0.95);
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  backdrop-filter: blur(8px);
-  cursor: pointer;
-  transition: all 220ms ease;
-}
-
-.fullscreen-button:hover {
-  border-color: rgba(188, 229, 255, 0.82);
-  box-shadow: 0 0 16px rgba(123, 193, 255, 0.35);
-  transform: translateY(-1px);
 }
 
 .hint-layer {

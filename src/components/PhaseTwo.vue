@@ -7,8 +7,6 @@ import MemoryDetail from './MemoryDetail.vue'
 
 const phase = ref<PlanetPhase>('forming')
 const activeMemory = ref<Memory | null>(null)
-const isFullscreen = ref(false)
-const rootRef = ref<HTMLElement | null>(null)
 
 const showDetail = computed(() => phase.value === 'viewing' && activeMemory.value !== null)
 
@@ -33,32 +31,10 @@ const handleReturnComplete = () => {
   activeMemory.value = null
   phase.value = 'exploring'
 }
-
-const toggleFullscreen = async () => {
-  if (!document.fullscreenElement) {
-    try {
-      await rootRef.value?.requestFullscreen()
-      isFullscreen.value = true
-    } catch {
-      console.warn('全屏请求被拒绝')
-    }
-  } else {
-    await document.exitFullscreen()
-    isFullscreen.value = false
-  }
-}
-
-const handleFullscreenChange = () => {
-  isFullscreen.value = !!document.fullscreenElement
-}
 </script>
 
 <template>
-  <div 
-    ref="rootRef"
-    class="phase-two"
-    @fullscreenchange="handleFullscreenChange"
-  >
+  <div class="phase-two">
     <MemoryPlanet
       :phase="phase"
       :memories="memories"
@@ -81,13 +57,6 @@ const handleFullscreenChange = () => {
         @close="handleDetailClose"
       />
     </Transition>
-
-    <button 
-      class="fullscreen-button" 
-      @click="toggleFullscreen"
-    >
-      {{ isFullscreen ? '退出全屏' : '进入全屏' }}
-    </button>
   </div>
 </template>
 
@@ -99,26 +68,5 @@ const handleFullscreenChange = () => {
   height: 100%;
   background: #000010;
   overflow: hidden;
-}
-
-.fullscreen-button {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  z-index: 100;
-  padding: 0.5rem 1rem;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 0.5rem;
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 0.875rem;
-  cursor: pointer;
-  backdrop-filter: blur(10px);
-  transition: all 0.3s ease;
-}
-
-.fullscreen-button:hover {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.4);
 }
 </style>
