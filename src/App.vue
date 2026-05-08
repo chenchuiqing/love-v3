@@ -4,12 +4,18 @@ import PhaseOne from './components/PhaseOne.vue';
 import PhaseTwo from './components/PhaseTwo.vue';
 
 const currentPhase = ref(1);
+const isTransitioning = ref(false);
 const isFullscreen = ref(false);
 const appRef = ref<HTMLElement | null>(null);
 
 const handlePhaseOneComplete = () => {
-  currentPhase.value = 2;
-  console.log('进入第二阶段：记忆星球');
+  isTransitioning.value = true;
+  setTimeout(() => {
+    currentPhase.value = 2;
+    setTimeout(() => {
+      isTransitioning.value = false;
+    }, 1200);
+  }, 800);
 };
 
 const toggleFullscreen = async () => {
@@ -45,13 +51,13 @@ onUnmounted(() => {
       {{ isFullscreen ? '退出全屏' : '进入全屏' }}
     </button>
 
+    <!-- 阶段过渡光芒 -->
+    <Transition name="flash">
+      <div v-if="isTransitioning" class="transition-flash"></div>
+    </Transition>
+
     <!-- 第一阶段：初见（星尘环绕） -->
-    <Transition
-      enter-active-class="transition-opacity duration-1000"
-      leave-active-class="transition-opacity duration-1000"
-      enter-from-class="opacity-0"
-      leave-to-class="opacity-0"
-    >
+    <Transition name="phase-fade">
       <PhaseOne 
         v-if="currentPhase === 1" 
         @complete="handlePhaseOneComplete" 
@@ -59,12 +65,7 @@ onUnmounted(() => {
     </Transition>
     
     <!-- 第二阶段：记忆星球 -->
-    <Transition
-      enter-active-class="transition-opacity duration-1000"
-      leave-active-class="transition-opacity duration-1000"
-      enter-from-class="opacity-0"
-      leave-to-class="opacity-0"
-    >
+    <Transition name="phase-fade">
       <PhaseTwo v-if="currentPhase === 2" />
     </Transition>
   </main>
@@ -111,6 +112,39 @@ body,
   border-color: rgba(188, 229, 255, 0.82);
   box-shadow: 0 0 16px rgba(123, 193, 255, 0.35);
   transform: translateY(-1px);
+}
+
+/* 阶段切换淡入淡出 */
+.phase-fade-enter-active {
+  transition: opacity 1.2s ease;
+}
+.phase-fade-leave-active {
+  transition: opacity 0.6s ease;
+}
+.phase-fade-enter-from,
+.phase-fade-leave-to {
+  opacity: 0;
+}
+
+/* 过渡光芒效果 */
+.transition-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 8000;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, rgba(200, 230, 255, 0.9) 0%, rgba(100, 180, 255, 0.4) 30%, transparent 70%);
+}
+.flash-enter-active {
+  transition: opacity 0.4s ease-out;
+}
+.flash-leave-active {
+  transition: opacity 1.2s ease-in;
+}
+.flash-enter-from {
+  opacity: 0;
+}
+.flash-leave-to {
+  opacity: 0;
 }
 </style>
 

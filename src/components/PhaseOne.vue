@@ -294,7 +294,6 @@ const handlePointerDown = () => {
   
   if (pressAnimation) pressAnimation.kill();
   
-  // 长按加速并汇聚，设定 3 秒到达极限
   pressAnimation = gsap.to(interactionState.value, {
     rotationSpeed: 0.05,
     convergenceFactor: 1,
@@ -302,6 +301,19 @@ const handlePointerDown = () => {
     ease: "power2.in",
     onComplete: () => {
       if (interactionState.value.isPressing) {
+        // 汇聚到极限后，增加一个持续的极亮脉冲感，再通知父组件
+        gsap.to(interactionState.value, {
+          rotationSpeed: 0.12,
+          duration: 0.6,
+          ease: "power1.in"
+        });
+        particleSystems.forEach((system) => {
+          gsap.to(system.material, {
+            opacity: 1.0,
+            duration: 0.5,
+            ease: "power2.out"
+          });
+        });
         emit('complete');
       }
     }
