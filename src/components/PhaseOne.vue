@@ -23,24 +23,11 @@ const CORE_PARTICLE_COUNT = 22000;
 const ARM_PARTICLE_COUNT = 18000;
 const FIELD_PARTICLE_COUNT = 7000;
 
-// 相机初始位置（Z 轴距离）
-const CAMERA_DISTANCE = 30;
-// 相机最大偏转角度（弧度），约 4.6°
-const MAX_CAMERA_ANGLE = 0.08;
-// 视差层系数：核心层（近）敏感，远景层（远）迟钝
-const PARALLAX_FACTORS = [0.12, 0.06, 0.02];
-
 // 交互状态
 const interactionState = ref({
   rotationSpeed: 0.001,
   convergenceFactor: 0, // 0: 原始状态, 1: 完全汇聚到中心
   isPressing: false,
-  // 目标角度（鼠标直接映射）
-  targetRotX: 0,
-  targetRotY: 0,
-  // 当前角度（阻尼平滑后）
-  currentRotX: 0,
-  currentRotY: 0,
 });
 
 let pressAnimation: gsap.core.Tween | null = null;
@@ -249,35 +236,13 @@ const animate = () => {
   animationFrameId = requestAnimationFrame(animate);
   
   if (particleSystems.length > 0) {
-    // 阻尼平滑：当前角度向目标角度靠近
-    const smoothing = 0.06;
-    interactionState.value.currentRotX += (interactionState.value.targetRotX - interactionState.value.currentRotX) * smoothing;
-    interactionState.value.currentRotY += (interactionState.value.targetRotY - interactionState.value.currentRotY) * smoothing;
-
-    const rotX = interactionState.value.currentRotX;
-    const rotY = interactionState.value.currentRotY;
-
-    // 相机弧形偏转：绕宇宙中心旋转，始终看向原点
-    camera.position.x = Math.sin(rotY) * CAMERA_DISTANCE;
-    camera.position.y = Math.sin(rotX) * CAMERA_DISTANCE * 0.6;
-    camera.position.z = Math.cos(rotY) * Math.cos(rotX) * CAMERA_DISTANCE;
-    camera.lookAt(0, 0, 0);
-
     const speed = interactionState.value.rotationSpeed;
     particleSystems.forEach((system, layerIndex) => {
       const base = baseRotations[layerIndex];
-      // 基础自转（绕 Y 轴）
+      // 锁定基础倾角，只保留绕 Y 轴的星系自转
+      system.rotation.x = base.x;
+      system.rotation.z = base.z;
       system.rotation.y += speed * (1 + layerIndex * 0.28);
-
-      // 分层视差：近处层敏感，远处层迟钝
-      const parallax = PARALLAX_FACTORS[layerIndex] ?? 0.05;
-      const drag = interactionState.value.isPressing ? 0.5 : 1;
-      system.rotation.x = base.x + rotX * parallax * drag;
-      system.rotation.z = base.z + rotY * parallax * drag * 0.5;
-
-      // 重置位置偏移（不再使用平移）
-      system.position.x = 0;
-      system.position.y = 0;
     });
 
     // 粒子汇聚效果
@@ -296,18 +261,6 @@ const animate = () => {
   if (renderer && scene && camera) {
     renderer.render(scene, camera);
   }
-};
-
-const handlePointerMove = (event: PointerEvent) => {
-  if (!rootRef.value) return;
-  const rect = rootRef.value.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0) return;
-
-  // 标准化到 [-1, 1]，然后映射到最大偏转角度
-  const normalizedX = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-  const normalizedY = ((event.clientY - rect.top) / rect.height) * 2 - 1;
-  interactionState.value.targetRotY = normalizedX * MAX_CAMERA_ANGLE;
-  interactionState.value.targetRotX = -normalizedY * MAX_CAMERA_ANGLE;
 };
 
 const handlePointerDown = () => {
@@ -355,11 +308,6 @@ const handlePointerUp = () => {
   });
 };
 
-const handlePointerOut = () => {
-  interactionState.value.targetRotX = 0;
-  interactionState.value.targetRotY = 0;
-};
-
 onMounted(() => {
   initScene();
   animate();
@@ -391,10 +339,8 @@ onBeforeUnmount(() => {
     ref="rootRef"
     class="phase-one"
     @pointerdown="handlePointerDown"
-    @pointermove="handlePointerMove"
     @pointerup="handlePointerUp"
     @pointerleave="handlePointerUp"
-    @pointerout="handlePointerOut"
     @contextmenu.prevent
   >
     <div ref="containerRef" class="canvas-layer"></div>
