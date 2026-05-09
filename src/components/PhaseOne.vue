@@ -26,7 +26,7 @@ const FIELD_PARTICLE_COUNT = 7000;
 // 交互状态
 const interactionState = ref({
   rotationSpeed: 0.001,
-  convergenceFactor: 0, // 0: 原始状态, 1: 完全汇聚到中心
+  convergenceFactor: 0, // 0: 原始状态, 1: 完全汇聚到中心，负值: 散开超出原始范围
   isPressing: false,
 });
 
@@ -245,13 +245,14 @@ const animate = () => {
       system.rotation.y += speed * (1 + layerIndex * 0.28);
     });
 
-    // 粒子汇聚效果
-    if (interactionState.value.convergenceFactor > 0) {
+    // 粒子位置更新（汇聚 & 散开）
+    if (interactionState.value.convergenceFactor !== 0) {
       particleSystems.forEach((system, layerIndex) => {
         const positions = system.geometry.attributes.position.array as Float32Array;
         const base = sourcePositions[layerIndex];
+        const factor = 1 - interactionState.value.convergenceFactor;
         for (let i = 0; i < positions.length; i++) {
-          positions[i] = base[i] * (1 - interactionState.value.convergenceFactor);
+          positions[i] = base[i] * factor;
         }
         system.geometry.attributes.position.needsUpdate = true;
       });
@@ -265,41 +266,68 @@ const animate = () => {
 
 const handlePointerDown = () => {
   interactionState.value.isPressing = true;
-  
+
   if (pressAnimation) pressAnimation.kill();
-  
+
   pressAnimation = gsap.to(interactionState.value, {
     rotationSpeed: 0.05,
     convergenceFactor: 1,
     duration: 3,
     ease: "power2.in",
     onComplete: () => {
-      if (interactionState.value.isPressing) {
-        // 汇聚到极限后，增加一个持续的极亮脉冲感，再通知父组件
-        gsap.to(interactionState.value, {
-          rotationSpeed: 0.12,
+      if (!interactionState.value.isPressing) return;
+
+      // 极亮脉冲
+      gsap.to(interactionState.value, {
+        rotationSpeed: 0.12,
+        duration: 0.6,
+        ease: "power1.in"
+      });
+      particleSystems.forEach((system) => {
+        gsap.to(system.material, {
+          opacity: 1.0,
+          duration: 0.5,
+          ease: "power2.out"
+        });
+      });
+
+      // 脉冲后自动散开
+      setTimeout(() => {
+        if (!interactionState.value.isPressing) return;
+
+        pressAnimation = gsap.to(interactionState.value, {
+          convergenceFactor: -0.3,
+          rotationSpeed: 0.2,
           duration: 0.6,
-          ease: "power1.in"
+          ease: "power2.out",
+          onComplete: () => {
+            gsap.to(interactionState.value, {
+              convergenceFactor: 0,
+              rotationSpeed: 0.08,
+              duration: 0.8,
+              ease: "power1.inOut",
+            });
+          }
         });
         particleSystems.forEach((system) => {
           gsap.to(system.material, {
-            opacity: 1.0,
-            duration: 0.5,
-            ease: "power2.out"
+            opacity: 0.15,
+            duration: 0.8,
+            ease: "power2.in"
           });
         });
         emit('complete');
-      }
+      }, 100);
     }
   });
 };
 
 const handlePointerUp = () => {
   interactionState.value.isPressing = false;
-  
+
   if (pressAnimation) pressAnimation.kill();
-  
-  // 松开恢复原状
+
+  // 未完成汇聚就松开 → 恢复原状
   pressAnimation = gsap.to(interactionState.value, {
     rotationSpeed: 0.001,
     convergenceFactor: 0,
