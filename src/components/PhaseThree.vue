@@ -15,6 +15,7 @@ const hasInteracted = ref(false)
 const isCollapsing = ref(false)
 const currentAct = ref<1 | 2>(1)
 const showShapeHint = ref(false)
+const photoStyle = ref({ width: '0px', height: '0px', opacity: 0 })
 
 let scene: THREE.Scene
 let camera: THREE.PerspectiveCamera
@@ -113,7 +114,10 @@ const initScene = () => {
 
 const animate = () => {
   animationId = requestAnimationFrame(animate)
-  particles.rotation.z += 0.0005
+  
+  if (currentAct.value === 1) {
+    particles.rotation.z += 0.0005
+  }
 
   if (currentAct.value === 2 && act2BasePositions) {
     act2BreathingTime += 0.03
@@ -321,8 +325,25 @@ const samplePhotoTargets = (): Promise<Float32Array> =>
 
       ctx.drawImage(img, 0, 0, W, H)
       const data = ctx.getImageData(0, 0, W, H).data
-      const worldW = 7.5
-      const worldH = (worldW * H) / W
+      
+      // 限制最大宽高，使其成为一个小相框
+      let worldH = 2.6
+      let worldW = worldH * (W / H)
+      if (worldW > 3.5) {
+        worldW = 3.5
+        worldH = worldW * (H / W)
+      }
+
+      // 计算相框在屏幕上的实际像素尺寸
+      const vFov = 56 * Math.PI / 180
+      const visibleHeight = 2 * Math.tan(vFov / 2) * 4 // camera.z = 4
+      if (containerRef.value) {
+        const pixelHeight = (worldH / visibleHeight) * containerRef.value.clientHeight
+        const pixelWidth = (worldW / visibleHeight) * containerRef.value.clientHeight
+        photoStyle.value.width = `${pixelWidth}px`
+        photoStyle.value.height = `${pixelHeight}px`
+      }
+
       const targets = new Float32Array(PARTICLE_COUNT * 3)
 
       for (let i = 0; i < PARTICLE_COUNT; i++) {
@@ -338,8 +359,8 @@ const samplePhotoTargets = (): Promise<Float32Array> =>
           tries += 1
         } while (tries < 30)
 
-        targets[i * 3] = (px / W - 0.5) * worldW
-        targets[i * 3 + 1] = -(py / H - 0.5) * worldH
+        targets[i * 3] = ((px + 0.5) / W - 0.5) * worldW
+        targets[i * 3 + 1] = -((py + 0.5) / H - 0.5) * worldH
         targets[i * 3 + 2] = (Math.random() - 0.5) * 0.1
       }
       resolve(targets)
@@ -383,6 +404,15 @@ const startAct2 = async () => {
   const photoTargets = await samplePhotoTargets()
   const morphStart = new Float32Array(particlePositions)
   const morphProgress = { value: 0 }
+
+  // 光影肖像先以逆时针方向转正，随后定格
+  particles.rotation.z = -0.9
+  gsap.to(particles.rotation, {
+    z: 0,
+    duration: 1.8,
+    ease: 'power2.inOut'
+  })
+
   await new Promise<void>((resolve) => {
     gsap.to(morphProgress, {
       value: 1,
@@ -402,13 +432,26 @@ const startAct2 = async () => {
   })
 
   act2BasePositions = new Float32Array(particlePositions)
-  if (photoRef.value) {
-    gsap.to(photoRef.value, {
-      opacity: 0.7,
-      duration: 2,
-      ease: 'power2.out'
+
+  // 转正后停留 3 秒，让人看清光影肖像
+  await new Promise(resolve => setTimeout(resolve, 3000))
+
+  // 3 秒内同步完成：粒子渐隐 + 照片显现，过渡更自然
+  gsap.to(particleMaterial, {
+    opacity: 0,
+    duration: 3,
+    ease: 'power2.inOut'
+  })
+
+  await new Promise<void>(resolve => {
+    gsap.to(photoStyle.value, {
+      opacity: 1,
+      duration: 3,
+      ease: 'power2.inOut',
+      onComplete: () => resolve()
     })
-  }
+  })
+
   emit('act1Complete')
 }
 
@@ -484,9 +527,12 @@ const resetDrawing = () => {
   act2BreathingTime = 0
   clearDrawingCanvas()
 
-  if (photoRef.value) {
-    gsap.set(photoRef.value, { opacity: 0 })
+  gsap.killTweensOf(particleMaterial)
+  if (particleMaterial) {
+    particleMaterial.opacity = 0.86
   }
+  gsap.killTweensOf(photoStyle.value)
+  photoStyle.value.opacity = 0
 
   const progress = { value: 0 }
   const startPositions = new Float32Array(particlePositions)
@@ -586,7 +632,7 @@ onUnmounted(() => {
     @pointerleave="handlePointerUp"
   >
     <canvas ref="drawingCanvasRef" class="drawing-layer" />
-    <img ref="photoRef" :src="PHOTO_URL" class="photo-overlay" alt="" />
+    <img ref="photoRef" :src="PHOTO_URL" class="photo-frame" :style="photoStyle" alt="" />
 
     <Transition
       enter-active-class="transition-opacity duration-500"
@@ -627,15 +673,17 @@ onUnmounted(() => {
   pointer-events: none;
 }
 
-.photo-overlay {
+.photo-frame {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   object-fit: cover;
-  opacity: 0;
+  border: 6px solid rgba(255, 255, 255, 0.95);
+  border-radius: 4px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 0 24px rgba(255, 255, 255, 0.2);
   pointer-events: none;
-  filter: saturate(0.92) contrast(1.02);
+  filter: saturate(0.95) contrast(1.05);
 }
 
 .draw-hint {
