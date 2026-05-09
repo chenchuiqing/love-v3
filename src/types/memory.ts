@@ -25,4 +25,4 @@ export interface Memory {
   content: MemoryContent
 }
 
-export type PlanetPhase = 'forming' | 'exploring' | 'zooming' | 'viewing' | 'returning'
+export type PlanetPhase = 'forming' | 'exploring' | 'zooming' | 'viewing' | 'returning' | 'awakening'

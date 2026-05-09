@@ -13,8 +13,10 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'formingComplete'): void
   (e: 'nodeClick', memory: Memory): void
+  (e: 'coreActivate'): void
   (e: 'zoomComplete'): void
   (e: 'returnComplete'): void
+  (e: 'awakeningComplete'): void
 }>()
 
 const containerRef = ref<HTMLElement | null>(null)
@@ -28,13 +30,17 @@ let starfieldPoints: THREE.Points
 let planetPoints: THREE.Points
 let orbitPoints: THREE.Points
 let nodeSprites: THREE.Sprite[] = []
+let coreSprite: THREE.Sprite | null = null
 let raycaster: THREE.Raycaster
 let mouse: THREE.Vector2
+let corePulseTween: gsap.core.Tween | null = null
 
 let planetGeometry: THREE.BufferGeometry
 let orbitGeometry: THREE.BufferGeometry
 let planetTargetPositions: Float32Array
 let orbitTargetPositions: Float32Array
+let isCoreActivated = false
+const visitedIds = new Set<string>()
 
 let isDragging = false
 let previousMousePosition = { x: 0, y: 0 }
@@ -135,6 +141,7 @@ const initScene = () => {
   createPlanetParticles()
   createOrbitParticles()
   createMemoryNodes()
+  createCoreSprite()
 
   animate()
 }
@@ -292,6 +299,43 @@ const createMemoryNodes = () => {
 
     nodeSprites.push(sprite)
     planetGroup.add(sprite)
+  })
+}
+
+const createCoreSprite = () => {
+  const texture = createGlowTexture('#ff8ecb')
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+  })
+
+  coreSprite = new THREE.Sprite(material)
+  coreSprite.scale.set(0.15, 0.15, 1)
+  coreSprite.position.set(0, 0, 0)
+  planetGroup.add(coreSprite)
+}
+
+const activateCore = () => {
+  if (!coreSprite || isCoreActivated) return
+  isCoreActivated = true
+
+  gsap.to(coreSprite.material, {
+    opacity: 0.95,
+    duration: 0.5,
+    ease: 'power2.out'
+  })
+
+  corePulseTween?.kill()
+  corePulseTween = gsap.to(coreSprite.scale, {
+    x: 0.22,
+    y: 0.22,
+    duration: 0.9,
+    repeat: -1,
+    yoyo: true,
+    ease: 'sine.inOut'
   })
 }
 
@@ -457,6 +501,74 @@ const animateReturning = () => {
   })
 }
 
+const animateAwakening = () => {
+  const planetPositions = planetGeometry.attributes.position.array as Float32Array
+  const orbitPositions = orbitGeometry.attributes.position.array as Float32Array
+  const planetStartPositions = new Float32Array(planetPositions)
+  const orbitStartPositions = new Float32Array(orbitPositions)
+  const planetPlaneTargets = new Float32Array(PLANET_PARTICLE_COUNT * 3)
+  const orbitPlaneTargets = new Float32Array(ORBIT_PARTICLE_COUNT * 3)
+
+  for (let i = 0; i < PLANET_PARTICLE_COUNT; i++) {
+    planetPlaneTargets[i * 3] = (Math.random() - 0.5) * 16
+    planetPlaneTargets[i * 3 + 1] = (Math.random() - 0.5) * 9
+    planetPlaneTargets[i * 3 + 2] = (Math.random() - 0.5) * 0.08
+  }
+
+  for (let i = 0; i < ORBIT_PARTICLE_COUNT; i++) {
+    orbitPlaneTargets[i * 3] = (Math.random() - 0.5) * 16
+    orbitPlaneTargets[i * 3 + 1] = (Math.random() - 0.5) * 9
+    orbitPlaneTargets[i * 3 + 2] = (Math.random() - 0.5) * 0.08
+  }
+
+  const tl = gsap.timeline({
+    onComplete: () => {
+      emit('awakeningComplete')
+    }
+  })
+
+  corePulseTween?.kill()
+  corePulseTween = null
+
+  nodeSprites.forEach((sprite) => {
+    tl.to(sprite.material, {
+      opacity: 0,
+      duration: 0.4
+    }, 0)
+  })
+
+  if (coreSprite) {
+    tl.to(coreSprite.material, {
+      opacity: 0,
+      duration: 0.5
+    }, 0)
+  }
+
+  const spreadProgress = { value: 0 }
+  tl.to(spreadProgress, {
+    value: 1,
+    duration: 2,
+    ease: 'power2.inOut',
+    onUpdate: () => {
+      const p = spreadProgress.value
+
+      for (let i = 0; i < PLANET_PARTICLE_COUNT; i++) {
+        planetPositions[i * 3] = THREE.MathUtils.lerp(planetStartPositions[i * 3], planetPlaneTargets[i * 3], p)
+        planetPositions[i * 3 + 1] = THREE.MathUtils.lerp(planetStartPositions[i * 3 + 1], planetPlaneTargets[i * 3 + 1], p)
+        planetPositions[i * 3 + 2] = THREE.MathUtils.lerp(planetStartPositions[i * 3 + 2], planetPlaneTargets[i * 3 + 2], p)
+      }
+      planetGeometry.attributes.position.needsUpdate = true
+
+      for (let i = 0; i < ORBIT_PARTICLE_COUNT; i++) {
+        orbitPositions[i * 3] = THREE.MathUtils.lerp(orbitStartPositions[i * 3], orbitPlaneTargets[i * 3], p)
+        orbitPositions[i * 3 + 1] = THREE.MathUtils.lerp(orbitStartPositions[i * 3 + 1], orbitPlaneTargets[i * 3 + 1], p)
+        orbitPositions[i * 3 + 2] = THREE.MathUtils.lerp(orbitStartPositions[i * 3 + 2], orbitPlaneTargets[i * 3 + 2], p)
+      }
+      orbitGeometry.attributes.position.needsUpdate = true
+    }
+  }, 0)
+}
+
 const handlePointerDown = (event: PointerEvent) => {
   if (props.phase !== 'exploring') return
   
@@ -484,17 +596,23 @@ const handlePointerMove = (event: PointerEvent) => {
 
   if (props.phase === 'exploring') {
     raycaster.setFromCamera(mouse, camera)
-    const intersects = raycaster.intersectObjects(nodeSprites)
+    const hoverTargets: THREE.Object3D[] = [...nodeSprites]
+    if (coreSprite && isCoreActivated) {
+      hoverTargets.push(coreSprite)
+    }
+    const intersects = raycaster.intersectObjects(hoverTargets)
 
     if (intersects.length > 0) {
       const sprite = intersects[0].object as THREE.Sprite
+      const isCore = coreSprite !== null && sprite === coreSprite
       if (hoveredSprite !== sprite) {
         if (hoveredSprite) {
           gsap.to(hoveredSprite.scale, { x: 0.25, y: 0.25, duration: 0.3 })
           gsap.to(hoveredSprite.material, { opacity: 0.9, duration: 0.3 })
         }
         hoveredSprite = sprite
-        gsap.to(sprite.scale, { x: 0.35, y: 0.35, duration: 0.3 })
+        const targetScale = isCore ? 0.28 : 0.35
+        gsap.to(sprite.scale, { x: targetScale, y: targetScale, duration: 0.3 })
         gsap.to(sprite.material, { opacity: 1, duration: 0.3 })
         document.body.style.cursor = 'pointer'
       }
@@ -521,11 +639,24 @@ const handleClick = (event: MouseEvent) => {
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
 
   raycaster.setFromCamera(mouse, camera)
-  const intersects = raycaster.intersectObjects(nodeSprites)
+  const clickTargets: THREE.Object3D[] = [...nodeSprites]
+  if (coreSprite && isCoreActivated) {
+    clickTargets.push(coreSprite)
+  }
+  const intersects = raycaster.intersectObjects(clickTargets)
 
   if (intersects.length > 0) {
     const sprite = intersects[0].object as THREE.Sprite
+    if (coreSprite && sprite === coreSprite && isCoreActivated) {
+      emit('coreActivate')
+      return
+    }
+
     const memory = sprite.userData.memory as Memory
+    visitedIds.add(memory.id)
+    if (visitedIds.size >= props.memories.length) {
+      activateCore()
+    }
     emit('nodeClick', memory)
   }
 }
@@ -572,6 +703,9 @@ watch(() => props.phase, (newPhase) => {
     case 'returning':
       animateReturning()
       break
+    case 'awakening':
+      animateAwakening()
+      break
   }
 })
 
@@ -601,6 +735,10 @@ onUnmounted(() => {
   nodeSprites.forEach((sprite) => {
     sprite.material.dispose()
   })
+  if (coreSprite) {
+    coreSprite.material.dispose()
+  }
+  corePulseTween?.kill()
 })
 </script>
 

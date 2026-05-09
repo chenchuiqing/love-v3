@@ -7,14 +7,23 @@ import MemoryDetail from './MemoryDetail.vue'
 
 const phase = ref<PlanetPhase>('forming')
 const activeMemory = ref<Memory | null>(null)
+const visitedIds = ref(new Set<string>())
+
+const emit = defineEmits<{
+  (e: 'complete'): void
+}>()
 
 const showDetail = computed(() => phase.value === 'viewing' && activeMemory.value !== null)
+const showCoreHint = computed(
+  () => phase.value === 'exploring' && visitedIds.value.size >= memories.length
+)
 
 const handleFormingComplete = () => {
   phase.value = 'exploring'
 }
 
 const handleNodeClick = (memory: Memory) => {
+  visitedIds.value.add(memory.id)
   activeMemory.value = memory
   phase.value = 'zooming'
 }
@@ -31,6 +40,15 @@ const handleReturnComplete = () => {
   activeMemory.value = null
   phase.value = 'exploring'
 }
+
+const handleCoreActivate = () => {
+  if (phase.value !== 'exploring') return
+  phase.value = 'awakening'
+}
+
+const handleAwakeningComplete = () => {
+  emit('complete')
+}
 </script>
 
 <template>
@@ -41,9 +59,22 @@ const handleReturnComplete = () => {
       :active-memory="activeMemory"
       @forming-complete="handleFormingComplete"
       @node-click="handleNodeClick"
+      @core-activate="handleCoreActivate"
       @zoom-complete="handleZoomComplete"
       @return-complete="handleReturnComplete"
+      @awakening-complete="handleAwakeningComplete"
     />
+
+    <Transition
+      enter-active-class="transition-opacity duration-500"
+      leave-active-class="transition-opacity duration-500"
+      enter-from-class="opacity-0"
+      leave-to-class="opacity-0"
+    >
+      <p v-if="showCoreHint" class="core-hint">
+        你已点亮所有回忆，现在，触碰星球的心脏
+      </p>
+    </Transition>
 
     <Transition
       enter-active-class="transition-opacity duration-500"
@@ -68,5 +99,22 @@ const handleReturnComplete = () => {
   height: 100%;
   background: #000010;
   overflow: hidden;
+}
+
+.core-hint {
+  position: absolute;
+  top: 4.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 0.45rem 0.95rem;
+  border: 1px solid rgba(255, 198, 227, 0.38);
+  border-radius: 999px;
+  background: rgba(26, 8, 36, 0.5);
+  backdrop-filter: blur(8px);
+  color: rgba(255, 230, 245, 0.95);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  z-index: 10;
 }
 </style>

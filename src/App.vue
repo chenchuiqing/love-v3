@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import PhaseOne from './components/PhaseOne.vue';
 import PhaseTwo from './components/PhaseTwo.vue';
+import PhaseThree from './components/PhaseThree.vue';
 
 const currentPhase = ref(1);
 const isTransitioning = ref(false);
@@ -16,6 +17,20 @@ const handlePhaseOneComplete = () => {
       isTransitioning.value = false;
     }, 1200);
   }, 800);
+};
+
+const handlePhaseTwoComplete = () => {
+  isTransitioning.value = true;
+  setTimeout(() => {
+    currentPhase.value = 3;
+    setTimeout(() => {
+      isTransitioning.value = false;
+    }, 1200);
+  }, 800);
+};
+
+const handleAct1Complete = () => {
+  console.info('阶段三第一幕已完成，待接入第二幕');
 };
 
 const toggleFullscreen = async () => {
@@ -66,7 +81,12 @@ onUnmounted(() => {
     
     <!-- 第二阶段：记忆星球 -->
     <Transition name="phase-fade">
-      <PhaseTwo v-if="currentPhase === 2" />
+      <PhaseTwo v-if="currentPhase === 2" @complete="handlePhaseTwoComplete" />
+    </Transition>
+
+    <!-- 第三阶段：手绘爱心 -->
+    <Transition name="phase-fade">
+      <PhaseThree v-if="currentPhase === 3" @act1-complete="handleAct1Complete" />
     </Transition>
   </main>
 </template>
