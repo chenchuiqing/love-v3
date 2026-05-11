@@ -8,14 +8,28 @@ const emit = defineEmits<{
 }>()
 
 const PHOTO_URL = '/photo.jpg'
+const CONFESSION_LINES = [
+  '那天你在地铁口等我，手里拿着热可可。',
+  '那一刻我知道，被你记住，是我最大的幸运。',
+  '往后的每一程星海，我都想牵着你走。'
+]
+
 const containerRef = ref<HTMLElement | null>(null)
 const drawingCanvasRef = ref<HTMLCanvasElement | null>(null)
 const photoRef = ref<HTMLImageElement | null>(null)
 const hasInteracted = ref(false)
 const isCollapsing = ref(false)
-const currentAct = ref<1 | 2>(1)
+const currentAct = ref<1 | 2 | 3 | 4>(1)
 const showShapeHint = ref(false)
 const photoStyle = ref({ width: '0px', height: '0px', opacity: 0 })
+
+const showEnvelopeHint = ref(false)
+const showLetterOverlay = ref(false)
+const typedLines = ref<string[]>(['', '', ''])
+const isEnvelopeOpening = ref(false)
+
+const showHapticText = ref(false)
+const showSaveBtn = ref(false)
 
 let scene: THREE.Scene
 let camera: THREE.PerspectiveCamera
@@ -25,11 +39,16 @@ let particles: THREE.Points
 let particleGeometry: THREE.BufferGeometry
 let particleMaterial: THREE.PointsMaterial
 let particlePositions: Float32Array
+let particleColors: Float32Array
 let basePositions: Float32Array
 let act2BasePositions: Float32Array | null = null
+let envelopeKindArr: Uint8Array | null = null
+let roseTargets: Float32Array | null = null
 let firstPathPoint: THREE.Vector2 | null = null
 let act2BreathingTime = 0
+let act4BreathingTime = 0
 let shapeHintTimer: ReturnType<typeof setTimeout> | null = null
+let hapticTextTimer: ReturnType<typeof setTimeout> | null = null
 
 const PARTICLE_COUNT = 15000
 const pathPoints: THREE.Vector2[] = []
@@ -37,6 +56,21 @@ const highlightedIndices = new Set<number>()
 
 const pointerState = {
   isDrawing: false
+}
+
+const envelopeTouchState = {
+  startX: 0,
+  startY: 0,
+  startTime: 0,
+  active: false
+}
+
+const act4RotateState = {
+  isDragging: false,
+  lastX: 0,
+  lastY: 0,
+  velocityX: 0,
+  velocityY: 0
 }
 
 const createParticleTexture = (): THREE.CanvasTexture => {
@@ -76,7 +110,7 @@ const initScene = () => {
   particleGeometry = new THREE.BufferGeometry()
   particlePositions = new Float32Array(PARTICLE_COUNT * 3)
   basePositions = new Float32Array(PARTICLE_COUNT * 3)
-  const colors = new Float32Array(PARTICLE_COUNT * 3)
+  particleColors = new Float32Array(PARTICLE_COUNT * 3)
 
   for (let i = 0; i < PARTICLE_COUNT; i++) {
     const x = (Math.random() - 0.5) * 12
@@ -90,13 +124,13 @@ const initScene = () => {
     basePositions[i * 3 + 1] = y
     basePositions[i * 3 + 2] = z
 
-    colors[i * 3] = 0.88 + Math.random() * 0.12
-    colors[i * 3 + 1] = 0.9 + Math.random() * 0.1
-    colors[i * 3 + 2] = 1
+    particleColors[i * 3] = 0.88 + Math.random() * 0.12
+    particleColors[i * 3 + 1] = 0.9 + Math.random() * 0.1
+    particleColors[i * 3 + 2] = 1
   }
 
   particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3))
-  particleGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+  particleGeometry.setAttribute('color', new THREE.BufferAttribute(particleColors, 3))
 
   particleMaterial = new THREE.PointsMaterial({
     size: 0.035,
@@ -126,6 +160,27 @@ const animate = () => {
       particlePositions[i * 3 + 1] = baseY + Math.sin(act2BreathingTime + i * 0.01) * 0.03
     }
     particleGeometry.attributes.position.needsUpdate = true
+  }
+
+  if (currentAct.value === 4 && roseTargets) {
+    act4BreathingTime += 0.018
+    // 花瓣微幅呼吸（仅对采样的稀疏粒子）
+    for (let i = 0; i < PARTICLE_COUNT; i += 7) {
+      const phase = act4BreathingTime + i * 0.013
+      const offset = Math.sin(phase) * 0.012
+      particlePositions[i * 3] = roseTargets[i * 3] + Math.cos(phase * 0.7) * 0.008
+      particlePositions[i * 3 + 1] = roseTargets[i * 3 + 1] + offset
+      particlePositions[i * 3 + 2] = roseTargets[i * 3 + 2] + Math.sin(phase * 0.9) * 0.008
+    }
+    particleGeometry.attributes.position.needsUpdate = true
+
+    // 自由旋转 + 拖拽惯性
+    if (!act4RotateState.isDragging) {
+      particles.rotation.y += act4RotateState.velocityX * 0.6 + 0.0025
+      particles.rotation.x += act4RotateState.velocityY * 0.6
+      act4RotateState.velocityX *= 0.92
+      act4RotateState.velocityY *= 0.92
+    }
   }
 
   renderer.render(scene, camera)
@@ -369,6 +424,194 @@ const samplePhotoTargets = (): Promise<Float32Array> =>
     img.src = PHOTO_URL
   })
 
+/**
+ * 计算信封形状的粒子目标位置。
+ * kind 含义: 0=信封主体 / 1=V 形折线 / 2=封口三角翼 / 3=蜡印圆簇
+ */
+const computeEnvelopePositions = (): { positions: Float32Array; kinds: Uint8Array } => {
+  const positions = new Float32Array(PARTICLE_COUNT * 3)
+  const kinds = new Uint8Array(PARTICLE_COUNT)
+
+  const envW = 2.6
+  const envH = 1.7
+  const cx = 0
+  const cy = -0.25
+
+  const halfW = envW / 2
+  const halfH = envH / 2
+
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    const r = Math.random()
+    let kind: 0 | 1 | 2 | 3
+    let x = 0
+    let y = 0
+    let z = (Math.random() - 0.5) * 0.06
+
+    if (r < 0.6) {
+      kind = 0
+      // 矩形主体：偏向边缘的粒子密度更高
+      const onEdge = Math.random() < 0.55
+      if (onEdge) {
+        const side = Math.floor(Math.random() * 4)
+        if (side === 0) {
+          x = cx - halfW + Math.random() * envW
+          y = cy + halfH - Math.random() * 0.04
+        } else if (side === 1) {
+          x = cx - halfW + Math.random() * envW
+          y = cy - halfH + Math.random() * 0.04
+        } else if (side === 2) {
+          x = cx - halfW + Math.random() * 0.04
+          y = cy - halfH + Math.random() * envH
+        } else {
+          x = cx + halfW - Math.random() * 0.04
+          y = cy - halfH + Math.random() * envH
+        }
+      } else {
+        x = cx + (Math.random() - 0.5) * envW
+        y = cy + (Math.random() - 0.5) * envH
+      }
+    } else if (r < 0.8) {
+      kind = 1
+      // V 形：从底角到中心顶部（顶端约位于矩形高度 60% 处）
+      const apexY = cy + halfH * 0.05
+      const apexX = cx
+      const leftCorner = { x: cx - halfW, y: cy + halfH }
+      const rightCorner = { x: cx + halfW, y: cy + halfH }
+      const t = Math.random()
+      const useLeft = Math.random() < 0.5
+      if (useLeft) {
+        x = leftCorner.x + (apexX - leftCorner.x) * t
+        y = leftCorner.y + (apexY - leftCorner.y) * t
+      } else {
+        x = rightCorner.x + (apexX - rightCorner.x) * t
+        y = rightCorner.y + (apexY - rightCorner.y) * t
+      }
+      x += (Math.random() - 0.5) * 0.02
+      y += (Math.random() - 0.5) * 0.02
+    } else if (r < 0.92) {
+      kind = 2
+      // 封口三角翼：上方三角（自上沿向下到 V 顶点）
+      const apexY = cy + halfH * 0.05
+      const topY = cy + halfH
+      const t = Math.random()
+      const lineY = topY - (topY - apexY) * t
+      const halfSpan = halfW * (1 - t)
+      x = cx + (Math.random() - 0.5) * halfSpan * 2
+      y = lineY + (Math.random() - 0.5) * 0.015
+      z += 0.04
+    } else {
+      kind = 3
+      // 蜡印圆簇：信封正中略偏下
+      const angle = Math.random() * Math.PI * 2
+      const radius = Math.sqrt(Math.random()) * 0.16
+      x = cx + Math.cos(angle) * radius
+      y = cy - 0.08 + Math.sin(angle) * radius
+      z += 0.05
+    }
+
+    positions[i * 3] = x
+    positions[i * 3 + 1] = y
+    positions[i * 3 + 2] = z
+    kinds[i] = kind
+  }
+
+  return { positions, kinds }
+}
+
+/**
+ * 计算 3D 玫瑰花的粒子目标位置。
+ * 5 外花瓣 + 5 内花瓣 + 中心花心。
+ */
+const computeRosePositions = (): Float32Array => {
+  const positions = new Float32Array(PARTICLE_COUNT * 3)
+
+  const OUTER_RATIO = 0.55
+  const INNER_RATIO = 0.3
+  const outerCount = Math.floor(PARTICLE_COUNT * OUTER_RATIO)
+  const innerCount = Math.floor(PARTICLE_COUNT * INNER_RATIO)
+
+  const petalSurface = (u: number, phi: number, radius: number, heightScale: number) => {
+    // u: 0(花心)→1(花瓣尖端), phi: 横向展开
+    const widen = Math.sin(u * Math.PI) // 中部最宽
+    const localX = phi * widen * radius * 0.8
+    const localY = u * radius * 1.05
+    // 花瓣外翻曲度
+    const curl = Math.sin(u * Math.PI) * 0.35 + (1 - u) * 0.1
+    const localZ = -Math.cos(phi * Math.PI * 0.5) * curl * radius * heightScale
+    return { localX, localY, localZ }
+  }
+
+  let idx = 0
+
+  for (let i = 0; i < outerCount; i++, idx++) {
+    const petalIdx = Math.floor(Math.random() * 5)
+    const baseAngle = (petalIdx / 5) * Math.PI * 2
+    const u = Math.pow(Math.random(), 0.7)
+    const phi = (Math.random() * 2 - 1)
+    const { localX, localY, localZ } = petalSurface(u, phi, 1.05, 1.0)
+
+    // 花瓣稍微向外翻仰
+    const tilt = 0.55
+    const cosT = Math.cos(tilt)
+    const sinT = Math.sin(tilt)
+    const ty = localY * cosT - localZ * sinT
+    const tz = localY * sinT + localZ * cosT
+
+    const cosA = Math.cos(baseAngle)
+    const sinA = Math.sin(baseAngle)
+    const x = localX * cosA - tz * sinA
+    const z = localX * sinA + tz * cosA
+    const y = ty - 0.05 + (Math.random() - 0.5) * 0.02
+
+    positions[idx * 3] = x
+    positions[idx * 3 + 1] = y
+    positions[idx * 3 + 2] = z
+  }
+
+  for (let i = 0; i < innerCount; i++, idx++) {
+    const petalIdx = Math.floor(Math.random() * 5)
+    const baseAngle = (petalIdx / 5) * Math.PI * 2 + Math.PI / 5
+    const u = Math.pow(Math.random(), 0.7)
+    const phi = (Math.random() * 2 - 1)
+    const { localX, localY, localZ } = petalSurface(u, phi, 0.62, 1.1)
+
+    // 内花瓣更内卷
+    const tilt = 0.3
+    const cosT = Math.cos(tilt)
+    const sinT = Math.sin(tilt)
+    const ty = localY * cosT - localZ * sinT
+    const tz = localY * sinT + localZ * cosT
+
+    const cosA = Math.cos(baseAngle)
+    const sinA = Math.sin(baseAngle)
+    const x = localX * cosA - tz * sinA
+    const z = localX * sinA + tz * cosA
+    const y = ty + 0.18 + (Math.random() - 0.5) * 0.02
+
+    positions[idx * 3] = x
+    positions[idx * 3 + 1] = y
+    positions[idx * 3 + 2] = z
+  }
+
+  for (; idx < PARTICLE_COUNT; idx++) {
+    // 花心：紧致的椭球簇
+    const theta = Math.random() * Math.PI * 2
+    const radius = Math.pow(Math.random(), 0.4) * 0.22
+    const heightT = Math.random()
+    const y = 0.18 + heightT * 0.32
+    const tightening = 1 - heightT * 0.6
+    const r = radius * tightening
+    const x = Math.cos(theta) * r
+    const z = Math.sin(theta) * r
+
+    positions[idx * 3] = x
+    positions[idx * 3 + 1] = y
+    positions[idx * 3 + 2] = z
+  }
+
+  return positions
+}
+
 const startAct2 = async () => {
   currentAct.value = 2
   clearDrawingCanvas()
@@ -452,7 +695,321 @@ const startAct2 = async () => {
     })
   })
 
+  // 照片定格观察片刻，再进入第三幕
+  await new Promise(resolve => setTimeout(resolve, 1500))
+  await startAct3()
+}
+
+/**
+ * 全局粒子颜色过渡到指定 RGB（每分量 0~1）。
+ */
+const tweenParticleColors = (target: [number, number, number], duration: number) => {
+  const startColors = new Float32Array(particleColors)
+  const progress = { value: 0 }
+  return new Promise<void>(resolve => {
+    gsap.to(progress, {
+      value: 1,
+      duration,
+      ease: 'power2.inOut',
+      onUpdate: () => {
+        const p = progress.value
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          particleColors[i * 3] = THREE.MathUtils.lerp(startColors[i * 3], target[0], p)
+          particleColors[i * 3 + 1] = THREE.MathUtils.lerp(startColors[i * 3 + 1], target[1], p)
+          particleColors[i * 3 + 2] = THREE.MathUtils.lerp(startColors[i * 3 + 2], target[2], p)
+        }
+        ;(particleGeometry.attributes.color as THREE.BufferAttribute).needsUpdate = true
+      },
+      onComplete: () => resolve()
+    })
+  })
+}
+
+const startAct3 = async () => {
+  currentAct.value = 3
+  act2BasePositions = null
+
+  // 计算信封目标位置
+  const { positions: envPositions, kinds } = computeEnvelopePositions()
+  envelopeKindArr = kinds
+
+  const morphStart = new Float32Array(particlePositions)
+  const morphProgress = { value: 0 }
+
+  // 粒子重新显现（与照片同步淡出）
+  gsap.to(particleMaterial, {
+    opacity: 0.86,
+    duration: 1.4,
+    ease: 'power2.inOut'
+  })
+  gsap.to(photoStyle.value, {
+    opacity: 0,
+    duration: 1.4,
+    ease: 'power2.inOut'
+  })
+
+  // 颜色过渡到暖金色（不阻塞）
+  tweenParticleColors([1.0, 0.88, 0.6], 1.6)
+
+  // 流沙式下坠：每个粒子带轻微随机延时，让动画更像沙子流动
+  await new Promise<void>(resolve => {
+    gsap.to(morphProgress, {
+      value: 1,
+      duration: 1.8,
+      ease: 'power2.in',
+      onUpdate: () => {
+        const p = morphProgress.value
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          // 让粒子越靠上、越晚开始下落
+          const delay = (morphStart[i * 3 + 1] + 4) / 8 * 0.2
+          const adjusted = THREE.MathUtils.clamp((p - delay) / (1 - delay), 0, 1)
+          const ease = adjusted * adjusted * (3 - 2 * adjusted)
+          particlePositions[i * 3] = THREE.MathUtils.lerp(morphStart[i * 3], envPositions[i * 3], ease)
+          particlePositions[i * 3 + 1] = THREE.MathUtils.lerp(morphStart[i * 3 + 1], envPositions[i * 3 + 1], ease)
+          particlePositions[i * 3 + 2] = THREE.MathUtils.lerp(morphStart[i * 3 + 2], envPositions[i * 3 + 2], ease)
+        }
+        particleGeometry.attributes.position.needsUpdate = true
+      },
+      onComplete: () => resolve()
+    })
+  })
+
+  // 信封成形，停留片刻后浮现提示
+  await new Promise(resolve => setTimeout(resolve, 600))
+  showEnvelopeHint.value = true
+}
+
+const typeLine = (lineIdx: number, text: string, charDelay = 90): Promise<void> =>
+  new Promise(resolve => {
+    let i = 0
+    const tick = () => {
+      i += 1
+      typedLines.value[lineIdx] = text.slice(0, i)
+      typedLines.value = [...typedLines.value]
+      if (i < text.length) {
+        setTimeout(tick, charDelay)
+      } else {
+        resolve()
+      }
+    }
+    tick()
+  })
+
+const openEnvelope = async () => {
+  if (isEnvelopeOpening.value || currentAct.value !== 3) return
+  if (!envelopeKindArr) return
+  isEnvelopeOpening.value = true
+  showEnvelopeHint.value = false
+
+  // 封口三角粒子向上散开（kind === 2）
+  const flapStart = new Float32Array(PARTICLE_COUNT * 3)
+  const flapTarget = new Float32Array(PARTICLE_COUNT * 3)
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    flapStart[i * 3] = particlePositions[i * 3]
+    flapStart[i * 3 + 1] = particlePositions[i * 3 + 1]
+    flapStart[i * 3 + 2] = particlePositions[i * 3 + 2]
+    if (envelopeKindArr[i] === 2) {
+      flapTarget[i * 3] = particlePositions[i * 3] + (Math.random() - 0.5) * 1.6
+      flapTarget[i * 3 + 1] = particlePositions[i * 3 + 1] + 0.6 + Math.random() * 0.8
+      flapTarget[i * 3 + 2] = particlePositions[i * 3 + 2] + (Math.random() - 0.2) * 0.6
+    } else {
+      flapTarget[i * 3] = particlePositions[i * 3]
+      flapTarget[i * 3 + 1] = particlePositions[i * 3 + 1]
+      flapTarget[i * 3 + 2] = particlePositions[i * 3 + 2]
+    }
+  }
+
+  const flapProgress = { value: 0 }
+  await new Promise<void>(resolve => {
+    gsap.to(flapProgress, {
+      value: 1,
+      duration: 0.6,
+      ease: 'power2.out',
+      onUpdate: () => {
+        const p = flapProgress.value
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          if (envelopeKindArr![i] === 2) {
+            particlePositions[i * 3] = THREE.MathUtils.lerp(flapStart[i * 3], flapTarget[i * 3], p)
+            particlePositions[i * 3 + 1] = THREE.MathUtils.lerp(flapStart[i * 3 + 1], flapTarget[i * 3 + 1], p)
+            particlePositions[i * 3 + 2] = THREE.MathUtils.lerp(flapStart[i * 3 + 2], flapTarget[i * 3 + 2], p)
+          }
+        }
+        particleGeometry.attributes.position.needsUpdate = true
+      },
+      onComplete: () => resolve()
+    })
+  })
+
+  // 信纸浮层淡入
+  showLetterOverlay.value = true
+  await new Promise(resolve => setTimeout(resolve, 700))
+
+  // 逐行打字机
+  for (let i = 0; i < CONFESSION_LINES.length; i++) {
+    await typeLine(i, CONFESSION_LINES[i], 110)
+    await new Promise(resolve => setTimeout(resolve, 350))
+  }
+
+  // 文字停留时间，让她从容看完
+  await new Promise(resolve => setTimeout(resolve, 2500))
+
+  // 信纸淡出后进入第四幕
+  showLetterOverlay.value = false
+  await new Promise(resolve => setTimeout(resolve, 600))
+  await startAct4()
+}
+
+const startAct4 = async () => {
+  currentAct.value = 4
+  envelopeKindArr = null
+
+  // 先导粒子：从信封中心螺旋升起
+  const guideGeometry = new THREE.SphereGeometry(0.04, 16, 16)
+  const guideMaterial = new THREE.MeshBasicMaterial({
+    color: 0xfff1c4,
+    transparent: true,
+    opacity: 1
+  })
+  const guide = new THREE.Mesh(guideGeometry, guideMaterial)
+  guide.position.set(0, -0.25, 0.1)
+  scene.add(guide)
+
+  const guideAnim = { t: 0 }
+  gsap.to(guideAnim, {
+    t: 1,
+    duration: 1.4,
+    ease: 'power2.out',
+    onUpdate: () => {
+      const t = guideAnim.t
+      const angle = t * Math.PI * 5
+      const radius = 0.45 * (1 - t * 0.6)
+      guide.position.x = Math.cos(angle) * radius
+      guide.position.y = -0.25 + t * 0.65
+      guide.position.z = Math.sin(angle) * radius * 0.6 + 0.1
+    },
+    onComplete: () => {
+      gsap.to(guideMaterial, {
+        opacity: 0,
+        duration: 0.4,
+        onComplete: () => {
+          scene.remove(guide)
+          guideGeometry.dispose()
+          guideMaterial.dispose()
+        }
+      })
+    }
+  })
+
+  // 同步进行：粒子颜色由暖金过渡到深红
+  tweenParticleColors([0.95, 0.1, 0.18], 1.8)
+
+  // 计算玫瑰目标
+  const roseTargetsLocal = computeRosePositions()
+  roseTargets = roseTargetsLocal
+
+  const morphStart = new Float32Array(particlePositions)
+  const morphProgress = { value: 0 }
+
+  // 让 morph 在视觉上像"螺旋汇流"：基于角度施加延时
+  await new Promise<void>(resolve => {
+    gsap.to(morphProgress, {
+      value: 1,
+      duration: 2.0,
+      ease: 'power2.inOut',
+      onUpdate: () => {
+        const p = morphProgress.value
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          const angle = Math.atan2(morphStart[i * 3 + 1] + 0.25, morphStart[i * 3])
+          const delay = ((angle + Math.PI) / (2 * Math.PI)) * 0.25
+          const adjusted = THREE.MathUtils.clamp((p - delay) / (1 - delay), 0, 1)
+          const ease = adjusted * adjusted * (3 - 2 * adjusted)
+
+          // 路径中途加入轻微的螺旋扰动
+          const swirl = Math.sin(ease * Math.PI) * 0.08
+          const cosS = Math.cos(swirl)
+          const sinS = Math.sin(swirl)
+
+          const lx = THREE.MathUtils.lerp(morphStart[i * 3], roseTargetsLocal[i * 3], ease)
+          const ly = THREE.MathUtils.lerp(morphStart[i * 3 + 1], roseTargetsLocal[i * 3 + 1], ease)
+          const lz = THREE.MathUtils.lerp(morphStart[i * 3 + 2], roseTargetsLocal[i * 3 + 2], ease)
+
+          particlePositions[i * 3] = lx * cosS - lz * sinS
+          particlePositions[i * 3 + 1] = ly
+          particlePositions[i * 3 + 2] = lx * sinS + lz * cosS
+        }
+        particleGeometry.attributes.position.needsUpdate = true
+      },
+      onComplete: () => resolve()
+    })
+  })
+
+  // 玫瑰稳定后：调亮一些以表现"绽放"
+  gsap.to(particleMaterial, {
+    opacity: 0.95,
+    size: 0.04,
+    duration: 0.8,
+    ease: 'power2.out'
+  })
+
+  // 延迟显示保存按钮
+  setTimeout(() => {
+    showSaveBtn.value = true
+  }, 2000)
+
   emit('act1Complete')
+}
+
+const triggerRoseHaptic = () => {
+  if (currentAct.value !== 4) return
+  if ('vibrate' in navigator) {
+    try {
+      navigator.vibrate(50)
+    } catch {
+      // ignore
+    }
+  }
+  showHapticText.value = true
+  if (hapticTextTimer) clearTimeout(hapticTextTimer)
+  hapticTextTimer = setTimeout(() => {
+    showHapticText.value = false
+  }, 2000)
+}
+
+const handleSavePoster = () => {
+  if (!renderer || !containerRef.value) return
+  const w = containerRef.value.clientWidth
+  const h = containerRef.value.clientHeight
+
+  const out = document.createElement('canvas')
+  out.width = w
+  out.height = h
+  const ctx = out.getContext('2d')
+  if (!ctx) return
+
+  // 背景：与场景同色，避免黑底硬边
+  ctx.fillStyle = '#000010'
+  ctx.fillRect(0, 0, w, h)
+  // 渲染当前 WebGL 帧到 2D 画布
+  renderer.render(scene, camera)
+  ctx.drawImage(renderer.domElement, 0, 0, w, h)
+
+  // 在底部叠加告白文字
+  ctx.textAlign = 'center'
+  ctx.fillStyle = 'rgba(255, 226, 232, 0.95)'
+  ctx.shadowColor = 'rgba(255, 80, 120, 0.5)'
+  ctx.shadowBlur = 12
+  const lineHeight = Math.max(22, Math.floor(h * 0.034))
+  const baseY = h - lineHeight * (CONFESSION_LINES.length + 1)
+  ctx.font = `${Math.floor(lineHeight * 0.7)}px "PingFang SC", "Microsoft YaHei", serif`
+  for (let i = 0; i < CONFESSION_LINES.length; i++) {
+    ctx.fillText(CONFESSION_LINES[i], w / 2, baseY + i * lineHeight)
+  }
+  ctx.shadowBlur = 0
+
+  const link = document.createElement('a')
+  link.download = 'love-letter.png'
+  link.href = out.toDataURL('image/png')
+  link.click()
 }
 
 const animateHeartCollapse = () => {
@@ -525,14 +1082,37 @@ const resetDrawing = () => {
   currentAct.value = 1
   act2BasePositions = null
   act2BreathingTime = 0
+  act4BreathingTime = 0
+  envelopeKindArr = null
+  roseTargets = null
+  showEnvelopeHint.value = false
+  showLetterOverlay.value = false
+  showHapticText.value = false
+  showSaveBtn.value = false
+  isEnvelopeOpening.value = false
+  typedLines.value = ['', '', '']
+  act4RotateState.isDragging = false
+  act4RotateState.velocityX = 0
+  act4RotateState.velocityY = 0
   clearDrawingCanvas()
 
   gsap.killTweensOf(particleMaterial)
   if (particleMaterial) {
     particleMaterial.opacity = 0.86
+    particleMaterial.size = 0.035
   }
   gsap.killTweensOf(photoStyle.value)
   photoStyle.value.opacity = 0
+
+  // 颜色复位为银白
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    particleColors[i * 3] = 0.88 + Math.random() * 0.12
+    particleColors[i * 3 + 1] = 0.9 + Math.random() * 0.1
+    particleColors[i * 3 + 2] = 1
+  }
+  ;(particleGeometry.attributes.color as THREE.BufferAttribute).needsUpdate = true
+
+  particles.rotation.set(0, 0, 0)
 
   const progress = { value: 0 }
   const startPositions = new Float32Array(particlePositions)
@@ -553,40 +1133,103 @@ const resetDrawing = () => {
 }
 
 const handlePointerDown = (event: PointerEvent) => {
-  if (isCollapsing.value || currentAct.value !== 1) return
-  pointerState.isDrawing = true
-  hasInteracted.value = true
-  showShapeHint.value = false
-  const world = screenToWorld(event.clientX, event.clientY)
-  if (!firstPathPoint) {
-    firstPathPoint = new THREE.Vector2(world.x, world.y)
+  if (currentAct.value === 1) {
+    if (isCollapsing.value) return
+    pointerState.isDrawing = true
+    hasInteracted.value = true
+    showShapeHint.value = false
+    const world = screenToWorld(event.clientX, event.clientY)
+    if (!firstPathPoint) {
+      firstPathPoint = new THREE.Vector2(world.x, world.y)
+    }
+    pathPoints.push(new THREE.Vector2(world.x, world.y))
+    attractParticlesToPoint(world)
+    return
   }
-  pathPoints.push(new THREE.Vector2(world.x, world.y))
-  attractParticlesToPoint(world)
+
+  if (currentAct.value === 3 && !isEnvelopeOpening.value && !showLetterOverlay.value) {
+    envelopeTouchState.startX = event.clientX
+    envelopeTouchState.startY = event.clientY
+    envelopeTouchState.startTime = Date.now()
+    envelopeTouchState.active = true
+    return
+  }
+
+  if (currentAct.value === 4) {
+    act4RotateState.isDragging = true
+    act4RotateState.lastX = event.clientX
+    act4RotateState.lastY = event.clientY
+    act4RotateState.velocityX = 0
+    act4RotateState.velocityY = 0
+  }
 }
 
 const handlePointerMove = (event: PointerEvent) => {
-  if (!pointerState.isDrawing || isCollapsing.value || currentAct.value !== 1) return
-  const previousEvent = (handlePointerMove as unknown as { prev?: PointerEvent }).prev
-  if (previousEvent) {
-    drawTrailSegment(previousEvent, event)
-  }
-  ;(handlePointerMove as unknown as { prev?: PointerEvent }).prev = event
+  if (currentAct.value === 1) {
+    if (!pointerState.isDrawing || isCollapsing.value) return
+    const previousEvent = (handlePointerMove as unknown as { prev?: PointerEvent }).prev
+    if (previousEvent) {
+      drawTrailSegment(previousEvent, event)
+    }
+    ;(handlePointerMove as unknown as { prev?: PointerEvent }).prev = event
 
-  const world = screenToWorld(event.clientX, event.clientY)
-  pathPoints.push(new THREE.Vector2(world.x, world.y))
-  attractParticlesToPoint(world)
+    const world = screenToWorld(event.clientX, event.clientY)
+    pathPoints.push(new THREE.Vector2(world.x, world.y))
+    attractParticlesToPoint(world)
+    return
+  }
+
+  if (currentAct.value === 4 && act4RotateState.isDragging) {
+    const dx = event.clientX - act4RotateState.lastX
+    const dy = event.clientY - act4RotateState.lastY
+    const rotY = dx * 0.005
+    const rotX = dy * 0.005
+    particles.rotation.y += rotY
+    particles.rotation.x = THREE.MathUtils.clamp(particles.rotation.x + rotX, -0.9, 0.9)
+    act4RotateState.velocityX = rotY
+    act4RotateState.velocityY = rotX
+    act4RotateState.lastX = event.clientX
+    act4RotateState.lastY = event.clientY
+  }
 }
 
-const handlePointerUp = () => {
-  if (!pointerState.isDrawing) return
-  pointerState.isDrawing = false
-  ;(handlePointerMove as unknown as { prev?: PointerEvent }).prev = undefined
+const handlePointerUp = (event: PointerEvent) => {
+  if (currentAct.value === 1) {
+    if (!pointerState.isDrawing) return
+    pointerState.isDrawing = false
+    ;(handlePointerMove as unknown as { prev?: PointerEvent }).prev = undefined
 
-  if (isHeartRecognized()) {
-    animateHeartCollapse()
-  } else if (pathPoints.length >= 15) {
-    showHintTemporarily()
+    if (isHeartRecognized()) {
+      animateHeartCollapse()
+    } else if (pathPoints.length >= 15) {
+      showHintTemporarily()
+    }
+    return
+  }
+
+  if (currentAct.value === 3 && envelopeTouchState.active) {
+    envelopeTouchState.active = false
+    const dx = event.clientX - envelopeTouchState.startX
+    const dy = event.clientY - envelopeTouchState.startY
+    const dt = Date.now() - envelopeTouchState.startTime
+    const distance = Math.hypot(dx, dy)
+    const isSwipeUp = dy < -30 && Math.abs(dy) > Math.abs(dx)
+    const isTap = distance < 12 && dt < 350
+    if (isSwipeUp || isTap) {
+      openEnvelope()
+    }
+    return
+  }
+
+  if (currentAct.value === 4 && act4RotateState.isDragging) {
+    act4RotateState.isDragging = false
+    const dx = event.clientX - act4RotateState.lastX
+    const dy = event.clientY - act4RotateState.lastY
+    const distance = Math.hypot(dx, dy)
+    // 小幅滑动视为点击 → 触发触觉反馈
+    if (distance < 6) {
+      triggerRoseHaptic()
+    }
   }
 }
 
@@ -640,7 +1283,7 @@ onUnmounted(() => {
       enter-from-class="opacity-0"
       leave-to-class="opacity-0"
     >
-      <p v-if="!hasInteracted" class="draw-hint">用你的指尖，画出心中的形状</p>
+      <p v-if="!hasInteracted && currentAct === 1" class="draw-hint">用你的指尖，画出心中的形状</p>
     </Transition>
     <Transition
       enter-active-class="transition-opacity duration-300"
@@ -651,7 +1294,59 @@ onUnmounted(() => {
       <p v-if="showShapeHint" class="shape-hint">再多画几笔，让爱心更完整</p>
     </Transition>
 
-    <button class="reset-btn" @click="resetDrawing">重新画</button>
+    <Transition
+      enter-active-class="transition-opacity duration-700"
+      leave-active-class="transition-opacity duration-500"
+      enter-from-class="opacity-0"
+      leave-to-class="opacity-0"
+    >
+      <p v-if="showEnvelopeHint && !showLetterOverlay" class="envelope-hint">
+        轻轻滑开，看看里面
+      </p>
+    </Transition>
+
+    <Transition
+      enter-active-class="transition-opacity duration-700"
+      leave-active-class="transition-opacity duration-500"
+      enter-from-class="opacity-0"
+      leave-to-class="opacity-0"
+    >
+      <div v-if="showLetterOverlay" class="letter-overlay">
+        <div class="letter-card">
+          <div class="letter-header">
+            <span class="letter-line"></span>
+            <span class="letter-date">致 你</span>
+            <span class="letter-line"></span>
+          </div>
+          <div class="letter-text">
+            <p v-for="(line, i) in typedLines" :key="i" class="letter-paragraph">
+              {{ line }}<span v-if="line && i === typedLines.length - 1" class="cursor">|</span>
+            </p>
+          </div>
+          <div class="letter-footer">— 永远爱你的人</div>
+        </div>
+      </div>
+    </Transition>
+
+    <Transition
+      enter-active-class="transition-opacity duration-300"
+      leave-active-class="transition-opacity duration-700"
+      enter-from-class="opacity-0"
+      leave-to-class="opacity-0"
+    >
+      <p v-if="showHapticText" class="haptic-text">我的心，始终随你而动。</p>
+    </Transition>
+
+    <Transition
+      enter-active-class="transition-opacity duration-700"
+      leave-active-class="transition-opacity duration-300"
+      enter-from-class="opacity-0"
+      leave-to-class="opacity-0"
+    >
+      <button v-if="showSaveBtn" class="save-btn" @click="handleSavePoster">留住这一刻</button>
+    </Transition>
+
+    <button v-if="currentAct === 1" class="reset-btn" @click="resetDrawing">重新画</button>
   </div>
 </template>
 
@@ -736,5 +1431,140 @@ onUnmounted(() => {
 
 .reset-btn:hover {
   box-shadow: 0 0 16px rgba(255, 129, 201, 0.35);
+}
+
+.envelope-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 18%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 0.55rem 1.25rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 220, 160, 0.5);
+  background: rgba(45, 25, 8, 0.45);
+  color: rgba(255, 240, 210, 0.95);
+  font-size: 0.86rem;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  text-shadow: 0 0 12px rgba(255, 196, 120, 0.45);
+  animation: gentle-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes gentle-pulse {
+  0%, 100% { opacity: 0.85; transform: translateX(-50%) translateY(0); }
+  50% { opacity: 1; transform: translateX(-50%) translateY(-3px); }
+}
+
+.letter-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 50%, rgba(15, 5, 25, 0.55) 0%, rgba(0, 0, 16, 0.78) 80%);
+  z-index: 10;
+  padding: 1.5rem;
+}
+
+.letter-card {
+  width: min(420px, 88vw);
+  padding: 2rem 1.8rem;
+  border-radius: 16px;
+  background: linear-gradient(155deg, rgba(252, 244, 228, 0.96), rgba(244, 228, 208, 0.92));
+  color: #5a3a2a;
+  box-shadow: 0 24px 72px rgba(0, 0, 0, 0.55), 0 0 32px rgba(255, 196, 120, 0.18);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 220, 180, 0.4);
+}
+
+.letter-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1.3rem;
+}
+
+.letter-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(140, 90, 50, 0.4), transparent);
+}
+
+.letter-date {
+  font-size: 0.78rem;
+  letter-spacing: 0.3em;
+  color: rgba(140, 90, 50, 0.85);
+}
+
+.letter-text {
+  font-family: 'KaiTi', 'STKaiti', 'PingFang SC', serif;
+  font-size: 1.05rem;
+  line-height: 2;
+  letter-spacing: 0.05em;
+  min-height: 6.3em;
+}
+
+.letter-paragraph {
+  margin: 0 0 0.4em 0;
+}
+
+.cursor {
+  display: inline-block;
+  margin-left: 2px;
+  color: rgba(180, 100, 60, 0.85);
+  animation: blink 0.9s steps(1) infinite;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.letter-footer {
+  margin-top: 1.4rem;
+  text-align: right;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  color: rgba(140, 90, 50, 0.7);
+}
+
+.haptic-text {
+  position: absolute;
+  left: 50%;
+  top: 12%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 0.55rem 1.4rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 150, 170, 0.45);
+  background: rgba(50, 6, 18, 0.55);
+  color: rgba(255, 220, 230, 0.96);
+  font-size: 0.88rem;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 14px rgba(255, 80, 120, 0.55);
+  white-space: nowrap;
+}
+
+.save-btn {
+  position: absolute;
+  right: 1.2rem;
+  bottom: 1.2rem;
+  z-index: 5;
+  padding: 0.55rem 1.15rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 200, 220, 0.5);
+  background: rgba(40, 8, 24, 0.55);
+  color: rgba(255, 232, 240, 0.96);
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: 240ms ease;
+}
+
+.save-btn:hover {
+  box-shadow: 0 0 18px rgba(255, 120, 170, 0.5);
+  transform: translateY(-1px);
 }
 </style>
