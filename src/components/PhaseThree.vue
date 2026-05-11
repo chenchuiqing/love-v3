@@ -44,6 +44,7 @@ let basePositions: Float32Array
 let act2BasePositions: Float32Array | null = null
 let envelopeKindArr: Uint8Array | null = null
 let roseTargets: Float32Array | null = null
+let heartSnapshot: HTMLCanvasElement | null = null
 let firstPathPoint: THREE.Vector2 | null = null
 let act2BreathingTime = 0
 let act4BreathingTime = 0
@@ -102,7 +103,7 @@ const initScene = () => {
   )
   camera.position.set(0, 0, 4)
 
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true })
   renderer.setSize(containerRef.value.clientWidth, containerRef.value.clientHeight)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
   containerRef.value.appendChild(renderer.domElement)
@@ -993,6 +994,26 @@ const handleSavePoster = () => {
   renderer.render(scene, camera)
   ctx.drawImage(renderer.domElement, 0, 0, w, h)
 
+  // 角落叠加她手绘的爱心（她创作的印记）
+  if (heartSnapshot) {
+    const targetW = Math.min(180, w * 0.22)
+    const ratio = heartSnapshot.height / heartSnapshot.width
+    const targetH = targetW * ratio
+    const margin = Math.max(20, Math.floor(w * 0.035))
+    ctx.save()
+    ctx.globalAlpha = 0.78
+    ctx.drawImage(heartSnapshot, w - targetW - margin, margin, targetW, targetH)
+    ctx.restore()
+
+    // 给爱心配一个克制的小标签
+    ctx.save()
+    ctx.textAlign = 'right'
+    ctx.fillStyle = 'rgba(255, 220, 230, 0.65)'
+    ctx.font = `${Math.max(11, Math.floor(w * 0.012))}px "PingFang SC", "Microsoft YaHei", serif`
+    ctx.fillText('— 由你亲手画下', w - margin, margin + targetH + 18)
+    ctx.restore()
+  }
+
   // 在底部叠加告白文字
   ctx.textAlign = 'center'
   ctx.fillStyle = 'rgba(255, 226, 232, 0.95)'
@@ -1012,9 +1033,67 @@ const handleSavePoster = () => {
   link.click()
 }
 
+/**
+ * 在塌缩开始时把用户手绘爱心的笔触快照保存下来，
+ * 供第四幕"留住这一刻"合成海报时使用。
+ */
+const snapshotHeartTrace = () => {
+  if (!drawingCanvasRef.value || pathPoints.length < 2) return
+
+  // 将世界坐标 pathPoints 投影回屏幕坐标，并取笔触的 bounding box
+  const screenPoints = pathPoints.map(p => {
+    const ndc = new THREE.Vector3(p.x, p.y, 0)
+    ndc.project(camera)
+    return {
+      x: ((ndc.x + 1) / 2) * drawingCanvasRef.value!.width,
+      y: ((-ndc.y + 1) / 2) * drawingCanvasRef.value!.height
+    }
+  })
+
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  for (const p of screenPoints) {
+    if (p.x < minX) minX = p.x
+    if (p.y < minY) minY = p.y
+    if (p.x > maxX) maxX = p.x
+    if (p.y > maxY) maxY = p.y
+  }
+
+  const padding = 36
+  const bw = Math.max(1, Math.ceil(maxX - minX + padding * 2))
+  const bh = Math.max(1, Math.ceil(maxY - minY + padding * 2))
+
+  const snap = document.createElement('canvas')
+  snap.width = bw
+  snap.height = bh
+  const ctx = snap.getContext('2d')
+  if (!ctx) return
+
+  // 用与绘制时一致的笔触样式重画，保留她笔下的发光质感
+  ctx.strokeStyle = 'rgba(255, 211, 236, 0.95)'
+  ctx.lineWidth = 3.2
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.shadowBlur = 14
+  ctx.shadowColor = 'rgba(255, 108, 176, 0.85)'
+  ctx.beginPath()
+  for (let i = 0; i < screenPoints.length; i++) {
+    const x = screenPoints[i].x - minX + padding
+    const y = screenPoints[i].y - minY + padding
+    if (i === 0) ctx.moveTo(x, y)
+    else ctx.lineTo(x, y)
+  }
+  ctx.stroke()
+
+  heartSnapshot = snap
+}
+
 const animateHeartCollapse = () => {
   if (isCollapsing.value || highlightedIndices.size === 0) return
   isCollapsing.value = true
+  snapshotHeartTrace()
 
   const indices = Array.from(highlightedIndices)
   const start = new Float32Array(indices.length * 3)
@@ -1085,6 +1164,7 @@ const resetDrawing = () => {
   act4BreathingTime = 0
   envelopeKindArr = null
   roseTargets = null
+  heartSnapshot = null
   showEnvelopeHint.value = false
   showLetterOverlay.value = false
   showHapticText.value = false
