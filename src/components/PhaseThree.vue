@@ -13,9 +13,18 @@ const drawingCanvasRef = ref<HTMLCanvasElement | null>(null)
 const photoRef = ref<HTMLImageElement | null>(null)
 const hasInteracted = ref(false)
 const isCollapsing = ref(false)
-const currentAct = ref<1 | 2>(1)
+const currentAct = ref<1 | 2 | 3 | 4>(1)
 const showShapeHint = ref(false)
 const photoStyle = ref({ width: '0px', height: '0px', opacity: 0 })
+
+const showEnvelopeHint = ref(false)
+const envelopeOpened = ref(false)
+const envelopeText = ref('')
+const envelopeFullText = '那天你在地铁口等我，手里拿着热可可。\n那一刻我知道，被你记住，是我最大的幸运。'
+
+const showRoseMessage = ref(false)
+const showPosterBtn = ref(false)
+const isRoseRotating = ref(false)
 
 let scene: THREE.Scene
 let camera: THREE.PerspectiveCamera
@@ -117,6 +126,10 @@ const animate = () => {
   
   if (currentAct.value === 1) {
     particles.rotation.z += 0.0005
+  } else if (isRoseRotating.value) {
+    particles.rotation.z += 0.002
+    particles.rotation.x += 0.001
+    particles.rotation.y += 0.001
   }
 
   if (currentAct.value === 2 && act2BasePositions) {
@@ -452,7 +465,204 @@ const startAct2 = async () => {
     })
   })
 
-  emit('act1Complete')
+  await new Promise(resolve => setTimeout(resolve, 3000))
+
+  await startAct3()
+}
+
+const sampleEnvelopeTargets = (): Float32Array => {
+  const targets = new Float32Array(PARTICLE_COUNT * 3)
+  const w = 4.0
+  const h = 2.4
+  const cy = -1.5 
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    const rand = Math.random()
+    let x, y
+    if (rand < 0.2) { 
+      x = (Math.random() - 0.5) * w
+      y = cy + h/2 - Math.abs(x) * 0.6 
+    } else if (rand < 0.4) { 
+      x = (Math.random() - 0.5) * w
+      y = cy - h/2
+    } else if (rand < 0.5) { 
+      x = -w/2
+      y = cy + (Math.random() - 0.5) * h
+    } else if (rand < 0.6) { 
+      x = w/2
+      y = cy + (Math.random() - 0.5) * h
+    } else { 
+      x = (Math.random() - 0.5) * w
+      y = cy + (Math.random() - 0.5) * h
+    }
+    targets[i * 3] = x
+    targets[i * 3 + 1] = y
+    targets[i * 3 + 2] = (Math.random() - 0.5) * 0.1
+  }
+  return targets
+}
+
+const startAct3 = async () => {
+  currentAct.value = 3
+  
+  gsap.to(photoStyle.value, {
+    opacity: 0,
+    duration: 1.5,
+    ease: 'power2.inOut'
+  })
+  
+  gsap.to(particleMaterial, {
+    opacity: 0.86,
+    duration: 1.5,
+    ease: 'power2.inOut'
+  })
+  
+  const targets = sampleEnvelopeTargets()
+  const start = new Float32Array(particlePositions)
+  const progress = { value: 0 }
+  
+  gsap.to(particles.rotation, {
+    z: 0,
+    duration: 2.5,
+    ease: 'power2.out'
+  })
+  
+  await new Promise<void>(resolve => {
+    gsap.to(progress, {
+      value: 1,
+      duration: 2.5,
+      ease: 'power2.out',
+      onUpdate: () => {
+        const p = progress.value
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          particlePositions[i * 3] = THREE.MathUtils.lerp(start[i * 3], targets[i * 3], p)
+          particlePositions[i * 3 + 1] = THREE.MathUtils.lerp(start[i * 3 + 1], targets[i * 3 + 1], p)
+          particlePositions[i * 3 + 2] = THREE.MathUtils.lerp(start[i * 3 + 2], targets[i * 3 + 2], p)
+        }
+        particleGeometry.attributes.position.needsUpdate = true
+      },
+      onComplete: () => resolve()
+    })
+  })
+  
+  showEnvelopeHint.value = true
+}
+
+const openEnvelope = async () => {
+  if (envelopeOpened.value) return
+  envelopeOpened.value = true
+  showEnvelopeHint.value = false
+  
+  const start = new Float32Array(particlePositions)
+  const targets = new Float32Array(PARTICLE_COUNT * 3)
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    if (Math.random() < 0.6) {
+      targets[i * 3] = (Math.random() - 0.5) * 12
+      targets[i * 3 + 1] = Math.random() * 8 - 2
+      targets[i * 3 + 2] = (Math.random() - 0.5) * 2
+    } else {
+      targets[i * 3] = start[i * 3]
+      targets[i * 3 + 1] = start[i * 3 + 1]
+      targets[i * 3 + 2] = start[i * 3 + 2]
+    }
+  }
+  
+  const progress = { value: 0 }
+  gsap.to(progress, {
+    value: 1,
+    duration: 2,
+    ease: 'power2.out',
+    onUpdate: () => {
+      const p = progress.value
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        particlePositions[i * 3] = THREE.MathUtils.lerp(start[i * 3], targets[i * 3], p)
+        particlePositions[i * 3 + 1] = THREE.MathUtils.lerp(start[i * 3 + 1], targets[i * 3 + 1], p)
+        particlePositions[i * 3 + 2] = THREE.MathUtils.lerp(start[i * 3 + 2], targets[i * 3 + 2], p)
+      }
+      particleGeometry.attributes.position.needsUpdate = true
+    }
+  })
+  
+  let currentLength = 0
+  const interval = setInterval(() => {
+    currentLength++
+    envelopeText.value = envelopeFullText.substring(0, currentLength)
+    if (currentLength >= envelopeFullText.length) {
+      clearInterval(interval)
+      setTimeout(() => {
+        startAct4()
+      }, 3000)
+    }
+  }, 100)
+}
+
+const sampleRoseTargets = (): Float32Array => {
+  const targets = new Float32Array(PARTICLE_COUNT * 3)
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    const theta = i * 2.39996 
+    const r = 0.05 * Math.sqrt(i)
+    const z = -0.2 * r * r + (Math.random() - 0.5) * 0.2
+    
+    const jitter = 0.1
+    targets[i * 3] = r * Math.cos(theta) + (Math.random() - 0.5) * jitter
+    targets[i * 3 + 1] = r * Math.sin(theta) + (Math.random() - 0.5) * jitter
+    targets[i * 3 + 2] = z
+  }
+  return targets
+}
+
+const startAct4 = async () => {
+  currentAct.value = 4
+  
+  envelopeText.value = ''
+  
+  const targets = sampleRoseTargets()
+  const start = new Float32Array(particlePositions)
+  const progress = { value: 0 }
+  
+  const colors = particleGeometry.attributes.color.array as Float32Array
+  const startColors = new Float32Array(colors)
+  
+  await new Promise<void>(resolve => {
+    gsap.to(progress, {
+      value: 1,
+      duration: 3,
+      ease: 'power3.inOut',
+      onUpdate: () => {
+        const p = progress.value
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          particlePositions[i * 3] = THREE.MathUtils.lerp(start[i * 3], targets[i * 3], p)
+          particlePositions[i * 3 + 1] = THREE.MathUtils.lerp(start[i * 3 + 1], targets[i * 3 + 1], p)
+          particlePositions[i * 3 + 2] = THREE.MathUtils.lerp(start[i * 3 + 2], targets[i * 3 + 2], p)
+          
+          colors[i * 3] = THREE.MathUtils.lerp(startColors[i * 3], 1.0, p) 
+          colors[i * 3 + 1] = THREE.MathUtils.lerp(startColors[i * 3 + 1], 0.1 + Math.random() * 0.1, p) 
+          colors[i * 3 + 2] = THREE.MathUtils.lerp(startColors[i * 3 + 2], 0.1 + Math.random() * 0.1, p) 
+        }
+        particleGeometry.attributes.position.needsUpdate = true
+        particleGeometry.attributes.color.needsUpdate = true
+      },
+      onComplete: () => resolve()
+    })
+  })
+  
+  isRoseRotating.value = true
+  showPosterBtn.value = true
+}
+
+const handleRoseClick = () => {
+  if (currentAct.value === 4) {
+    if (navigator.vibrate) {
+      navigator.vibrate(50)
+    }
+    showRoseMessage.value = true
+    setTimeout(() => {
+      showRoseMessage.value = false
+    }, 2000)
+  }
+}
+
+const savePoster = () => {
+  emit('act1Complete') // trigger next phase or complete
 }
 
 const animateHeartCollapse = () => {
@@ -553,6 +763,14 @@ const resetDrawing = () => {
 }
 
 const handlePointerDown = (event: PointerEvent) => {
+  if (currentAct.value === 4) {
+    handleRoseClick()
+    return
+  }
+  if (currentAct.value === 3 && showEnvelopeHint.value) {
+    openEnvelope()
+    return
+  }
   if (isCollapsing.value || currentAct.value !== 1) return
   pointerState.isDrawing = true
   hasInteracted.value = true
@@ -634,13 +852,14 @@ onUnmounted(() => {
     <canvas ref="drawingCanvasRef" class="drawing-layer" />
     <img ref="photoRef" :src="PHOTO_URL" class="photo-frame" :style="photoStyle" alt="" />
 
+    <!-- Act 1 & 2 hints -->
     <Transition
       enter-active-class="transition-opacity duration-500"
       leave-active-class="transition-opacity duration-500"
       enter-from-class="opacity-0"
       leave-to-class="opacity-0"
     >
-      <p v-if="!hasInteracted" class="draw-hint">用你的指尖，画出心中的形状</p>
+      <p v-if="!hasInteracted && currentAct === 1" class="draw-hint">用你的指尖，画出心中的形状</p>
     </Transition>
     <Transition
       enter-active-class="transition-opacity duration-300"
@@ -648,10 +867,45 @@ onUnmounted(() => {
       enter-from-class="opacity-0"
       leave-to-class="opacity-0"
     >
-      <p v-if="showShapeHint" class="shape-hint">再多画几笔，让爱心更完整</p>
+      <p v-if="showShapeHint && currentAct === 1" class="shape-hint">再多画几笔，让爱心更完整</p>
     </Transition>
 
-    <button class="reset-btn" @click="resetDrawing">重新画</button>
+    <button v-if="currentAct === 1" class="reset-btn" @click="resetDrawing">重新画</button>
+
+    <!-- Act 3 Envelope -->
+    <Transition
+      enter-active-class="transition-opacity duration-800"
+      leave-active-class="transition-opacity duration-500"
+      enter-from-class="opacity-0"
+      leave-to-class="opacity-0"
+    >
+      <div v-if="currentAct === 3" class="act3-layer">
+        <p v-if="showEnvelopeHint" class="envelope-click-hint">轻轻滑开，看看里面</p>
+        <div v-if="envelopeText" class="envelope-text">
+          <p v-for="(line, index) in envelopeText.split('\n')" :key="index">{{ line }}</p>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- Act 4 Rose -->
+    <Transition
+      enter-active-class="transition-opacity duration-800"
+      leave-active-class="transition-opacity duration-500"
+      enter-from-class="opacity-0"
+      leave-to-class="opacity-0"
+    >
+      <div v-if="currentAct === 4" class="act4-layer">
+        <Transition
+          enter-active-class="transition-opacity duration-500"
+          leave-active-class="transition-opacity duration-500"
+          enter-from-class="opacity-0"
+          leave-to-class="opacity-0"
+        >
+          <p v-if="showRoseMessage" class="rose-message">我的心，始终随你而动。</p>
+        </Transition>
+        <button v-if="showPosterBtn" class="poster-btn" @click.stop="savePoster">留住这一刻</button>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -736,5 +990,78 @@ onUnmounted(() => {
 
 .reset-btn:hover {
   box-shadow: 0 0 16px rgba(255, 129, 201, 0.35);
+}
+
+.act3-layer, .act4-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.envelope-click-hint {
+  position: absolute;
+  bottom: 25%;
+  margin: 0;
+  padding: 0.52rem 1.1rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  backdrop-filter: blur(4px);
+  animation: pulse 2s infinite ease-in-out;
+}
+
+.envelope-text {
+  position: absolute;
+  top: 40%;
+  max-width: 80%;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 1rem;
+  line-height: 1.8;
+  letter-spacing: 0.05em;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+}
+
+.rose-message {
+  position: absolute;
+  top: 20%;
+  margin: 0;
+  color: rgba(255, 180, 200, 0.95);
+  font-size: 1.1rem;
+  letter-spacing: 0.1em;
+  text-shadow: 0 0 12px rgba(255, 50, 100, 0.6);
+}
+
+.poster-btn {
+  position: absolute;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  padding: 0.5rem 1.2rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 100, 150, 0.5);
+  background: rgba(20, 5, 10, 0.6);
+  color: rgba(255, 200, 220, 0.95);
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: all 0.3s ease;
+}
+
+.poster-btn:hover {
+  background: rgba(255, 50, 100, 0.3);
+  box-shadow: 0 0 20px rgba(255, 50, 100, 0.4);
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.8; }
 }
 </style>
