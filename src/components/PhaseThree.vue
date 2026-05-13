@@ -53,6 +53,10 @@ let hapticTextTimer: ReturnType<typeof setTimeout> | null = null
 
 const PARTICLE_COUNT = 15000
 const pathPoints: THREE.Vector2[] = []
+/** 与 drawingCanvas 像素一致的屏幕轨迹，供识别与海报快照；避免 world→NDC 误差与抬笔后连线 */
+const traceScreenPoints: { x: number; y: number }[] = []
+/** 每一笔的起点在 traceScreenPoints 中的下标，快照时用 moveTo 断开，避免出现穿心竖线 */
+const traceStrokeStarts: number[] = []
 const highlightedIndices = new Set<number>()
 
 const pointerState = {
@@ -321,15 +325,18 @@ const checkTraceCoverage = (): boolean => {
     })
   }
 
-  // 2. 将世界坐标的 pathPoints 转回屏幕坐标
-  const screenPathPoints = pathPoints.map(p => {
-    const ndc = new THREE.Vector3(p.x, p.y, 0)
-    ndc.project(camera)
-    return {
-      x: (ndc.x + 1) / 2 * w,
-      y: -(ndc.y - 1) / 2 * h
-    }
-  })
+  // 2. 使用真实屏幕轨迹（与 drawTrailSegment 同源），避免错误 project 导致形变
+  const screenPathPoints =
+    traceScreenPoints.length >= 2
+      ? traceScreenPoints
+      : pathPoints.map((p) => {
+          const v = new THREE.Vector3(p.x, p.y, 0)
+          v.project(camera)
+          return {
+            x: ((v.x + 1) / 2) * w,
+            y: ((-v.y + 1) / 2) * h
+          }
+        })
 
   // 3. 计算覆盖率（只要离标准点足够近就算覆盖）
   let coveredCount = 0
@@ -1038,17 +1045,27 @@ const handleSavePoster = () => {
  * 供第四幕"留住这一刻"合成海报时使用。
  */
 const snapshotHeartTrace = () => {
-  if (!drawingCanvasRef.value || pathPoints.length < 2) return
+  if (!drawingCanvasRef.value) return
+  const cw = drawingCanvasRef.value.width
+  const ch = drawingCanvasRef.value.height
 
-  // 将世界坐标 pathPoints 投影回屏幕坐标，并取笔触的 bounding box
-  const screenPoints = pathPoints.map(p => {
-    const ndc = new THREE.Vector3(p.x, p.y, 0)
-    ndc.project(camera)
-    return {
-      x: ((ndc.x + 1) / 2) * drawingCanvasRef.value!.width,
-      y: ((-ndc.y + 1) / 2) * drawingCanvasRef.value!.height
-    }
-  })
+  const screenPoints =
+    traceScreenPoints.length >= 2
+      ? traceScreenPoints
+      : pathPoints.length >= 2
+        ? pathPoints.map((p) => {
+            const v = new THREE.Vector3(p.x, p.y, 0)
+            v.project(camera)
+            return {
+              x: ((v.x + 1) / 2) * cw,
+              y: ((-v.y + 1) / 2) * ch
+            }
+          })
+        : []
+
+  if (screenPoints.length < 2) return
+
+  const strokeStartSet = new Set(traceStrokeStarts)
 
   let minX = Infinity
   let minY = Infinity
@@ -1071,6 +1088,9 @@ const snapshotHeartTrace = () => {
   const ctx = snap.getContext('2d')
   if (!ctx) return
 
+  const minSpan = Math.min(bw, bh)
+  const maxJoinSq = Math.pow(minSpan * 0.14, 2)
+
   // 用与绘制时一致的笔触样式重画，保留她笔下的发光质感
   ctx.strokeStyle = 'rgba(255, 211, 236, 0.95)'
   ctx.lineWidth = 3.2
@@ -1082,7 +1102,14 @@ const snapshotHeartTrace = () => {
   for (let i = 0; i < screenPoints.length; i++) {
     const x = screenPoints[i].x - minX + padding
     const y = screenPoints[i].y - minY + padding
-    if (i === 0) ctx.moveTo(x, y)
+    let useMove = i === 0 || strokeStartSet.has(i)
+    if (!useMove && i > 0) {
+      const px = screenPoints[i - 1].x - minX + padding
+      const py = screenPoints[i - 1].y - minY + padding
+      const dsq = (x - px) * (x - px) + (y - py) * (y - py)
+      if (dsq > maxJoinSq) useMove = true
+    }
+    if (useMove) ctx.moveTo(x, y)
     else ctx.lineTo(x, y)
   }
   ctx.stroke()
@@ -1153,6 +1180,8 @@ const clearDrawingCanvas = () => {
 const resetDrawing = () => {
   if (isCollapsing.value && currentAct.value === 1) return
   pathPoints.length = 0
+  traceScreenPoints.length = 0
+  traceStrokeStarts.length = 0
   highlightedIndices.clear()
   hasInteracted.value = false
   firstPathPoint = null
@@ -1218,6 +1247,12 @@ const handlePointerDown = (event: PointerEvent) => {
     pointerState.isDrawing = true
     hasInteracted.value = true
     showShapeHint.value = false
+    const rect = containerRef.value!.getBoundingClientRect()
+    traceStrokeStarts.push(traceScreenPoints.length)
+    traceScreenPoints.push({
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top
+    })
     const world = screenToWorld(event.clientX, event.clientY)
     if (!firstPathPoint) {
       firstPathPoint = new THREE.Vector2(world.x, world.y)
@@ -1253,6 +1288,11 @@ const handlePointerMove = (event: PointerEvent) => {
     }
     ;(handlePointerMove as unknown as { prev?: PointerEvent }).prev = event
 
+    const rect = containerRef.value!.getBoundingClientRect()
+    traceScreenPoints.push({
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top
+    })
     const world = screenToWorld(event.clientX, event.clientY)
     pathPoints.push(new THREE.Vector2(world.x, world.y))
     attractParticlesToPoint(world)
