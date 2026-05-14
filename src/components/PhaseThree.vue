@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import * as THREE from 'three'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { MeshSurfaceSampler } from 'three/examples/jsm/math/MeshSurfaceSampler.js'
 import gsap from 'gsap'
 
 const emit = defineEmits<{
@@ -527,97 +529,73 @@ const computeEnvelopePositions = (): { positions: Float32Array; kinds: Uint8Arra
 }
 
 /**
- * 计算 3D 玫瑰花的粒子目标位置。
- * 5 外花瓣 + 5 内花瓣 + 中心花心。
+ * 加载 public/rose.glb 模型，并在其表面采样计算 3D 玫瑰花的粒子目标位置。
  */
-const computeRosePositions = (): Float32Array => {
-  const positions = new Float32Array(PARTICLE_COUNT * 3)
+const loadRoseModelTargets = async (): Promise<Float32Array> => {
+  return new Promise((resolve) => {
+    const loader = new GLTFLoader()
+    loader.load(
+      '/rose.glb',
+      (gltf) => {
+        const positions = new Float32Array(PARTICLE_COUNT * 3)
+        gltf.scene.updateMatrixWorld(true)
+        
+        const meshes: THREE.Mesh[] = []
+        gltf.scene.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+            meshes.push(child as THREE.Mesh)
+          }
+        })
 
-  const OUTER_RATIO = 0.55
-  const INNER_RATIO = 0.3
-  const outerCount = Math.floor(PARTICLE_COUNT * OUTER_RATIO)
-  const innerCount = Math.floor(PARTICLE_COUNT * INNER_RATIO)
+        if (meshes.length === 0) {
+          console.warn('No meshes found in rose.glb')
+          resolve(positions)
+          return
+        }
 
-  const petalSurface = (u: number, phi: number, radius: number, heightScale: number) => {
-    // u: 0(花心)→1(花瓣尖端), phi: 横向展开
-    const widen = Math.sin(u * Math.PI) // 中部最宽
-    const localX = phi * widen * radius * 0.8
-    const localY = u * radius * 1.05
-    // 花瓣外翻曲度
-    const curl = Math.sin(u * Math.PI) * 0.35 + (1 - u) * 0.1
-    const localZ = -Math.cos(phi * Math.PI * 0.5) * curl * radius * heightScale
-    return { localX, localY, localZ }
-  }
+        const samplers = meshes.map(mesh => ({
+          sampler: new MeshSurfaceSampler(mesh).build(),
+          mesh: mesh
+        }))
 
-  let idx = 0
-
-  for (let i = 0; i < outerCount; i++, idx++) {
-    const petalIdx = Math.floor(Math.random() * 5)
-    const baseAngle = (petalIdx / 5) * Math.PI * 2
-    const u = Math.pow(Math.random(), 0.7)
-    const phi = (Math.random() * 2 - 1)
-    const { localX, localY, localZ } = petalSurface(u, phi, 1.05, 1.0)
-
-    // 花瓣稍微向外翻仰
-    const tilt = 0.55
-    const cosT = Math.cos(tilt)
-    const sinT = Math.sin(tilt)
-    const ty = localY * cosT - localZ * sinT
-    const tz = localY * sinT + localZ * cosT
-
-    const cosA = Math.cos(baseAngle)
-    const sinA = Math.sin(baseAngle)
-    const x = localX * cosA - tz * sinA
-    const z = localX * sinA + tz * cosA
-    const y = ty - 0.05 + (Math.random() - 0.5) * 0.02
-
-    positions[idx * 3] = x
-    positions[idx * 3 + 1] = y
-    positions[idx * 3 + 2] = z
-  }
-
-  for (let i = 0; i < innerCount; i++, idx++) {
-    const petalIdx = Math.floor(Math.random() * 5)
-    const baseAngle = (petalIdx / 5) * Math.PI * 2 + Math.PI / 5
-    const u = Math.pow(Math.random(), 0.7)
-    const phi = (Math.random() * 2 - 1)
-    const { localX, localY, localZ } = petalSurface(u, phi, 0.62, 1.1)
-
-    // 内花瓣更内卷
-    const tilt = 0.3
-    const cosT = Math.cos(tilt)
-    const sinT = Math.sin(tilt)
-    const ty = localY * cosT - localZ * sinT
-    const tz = localY * sinT + localZ * cosT
-
-    const cosA = Math.cos(baseAngle)
-    const sinA = Math.sin(baseAngle)
-    const x = localX * cosA - tz * sinA
-    const z = localX * sinA + tz * cosA
-    const y = ty + 0.18 + (Math.random() - 0.5) * 0.02
-
-    positions[idx * 3] = x
-    positions[idx * 3 + 1] = y
-    positions[idx * 3 + 2] = z
-  }
-
-  for (; idx < PARTICLE_COUNT; idx++) {
-    // 花心：紧致的椭球簇
-    const theta = Math.random() * Math.PI * 2
-    const radius = Math.pow(Math.random(), 0.4) * 0.22
-    const heightT = Math.random()
-    const y = 0.18 + heightT * 0.32
-    const tightening = 1 - heightT * 0.6
-    const r = radius * tightening
-    const x = Math.cos(theta) * r
-    const z = Math.sin(theta) * r
-
-    positions[idx * 3] = x
-    positions[idx * 3 + 1] = y
-    positions[idx * 3 + 2] = z
-  }
-
-  return positions
+        const _position = new THREE.Vector3()
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          const { sampler, mesh } = samplers[Math.floor(Math.random() * samplers.length)]
+          sampler.sample(_position)
+          _position.applyMatrix4(mesh.matrixWorld)
+          
+          positions[i * 3] = _position.x
+          positions[i * 3 + 1] = _position.y
+          positions[i * 3 + 2] = _position.z
+        }
+        
+        // Normalize and scale the positions
+        const box = new THREE.Box3()
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          _position.set(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2])
+          box.expandByPoint(_position)
+        }
+        
+        const center = box.getCenter(new THREE.Vector3())
+        const size = box.getSize(new THREE.Vector3())
+        const maxDim = Math.max(size.x, size.y, size.z)
+        const scale = maxDim > 0 ? 2.5 / maxDim : 1.0
+        
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          positions[i * 3] = (positions[i * 3] - center.x) * scale
+          positions[i * 3 + 1] = (positions[i * 3 + 1] - center.y) * scale + 0.2
+          positions[i * 3 + 2] = (positions[i * 3 + 2] - center.z) * scale
+        }
+        
+        resolve(positions)
+      },
+      undefined,
+      (error) => {
+        console.error('Error loading rose.glb:', error)
+        resolve(new Float32Array(PARTICLE_COUNT * 3))
+      }
+    )
+  })
 }
 
 const startAct2 = async () => {
@@ -912,7 +890,7 @@ const startAct4 = async () => {
   tweenParticleColors([0.95, 0.1, 0.18], 1.8)
 
   // 计算玫瑰目标
-  const roseTargetsLocal = computeRosePositions()
+  const roseTargetsLocal = await loadRoseModelTargets()
   roseTargets = roseTargetsLocal
 
   const morphStart = new Float32Array(particlePositions)
