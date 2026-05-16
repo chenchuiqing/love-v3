@@ -37,6 +37,22 @@ const themeColors = computed(() => {
       return { primary: '#0a4a2e', secondary: '#1a6b48', accent: '#2ecc71' }
     case 'city':
       return { primary: '#2a1a4a', secondary: '#4a2a7a', accent: '#9b59b6' }
+    case 'sky':
+      return { primary: '#1e6a9e', secondary: '#4a9fd4', accent: '#9ed4f5' }
+    case 'summit':
+      return { primary: '#1a5268', secondary: '#2d7a8c', accent: '#7ec8b8' }
+    case 'sunshine':
+      return { primary: '#4a5020', secondary: '#7a8040', accent: '#f0d060' }
+    case 'meadow':
+      return { primary: '#2a6040', secondary: '#4a9060', accent: '#b8e8a0' }
+    case 'night':
+      return { primary: '#05070a', secondary: '#141a22', accent: '#5a6578' }
+    case 'fireworks':
+      return { primary: '#07050a', secondary: '#2a1420', accent: '#e8944a' }
+    case 'moonlight':
+      return { primary: '#030508', secondary: '#0c1420', accent: '#a8bcd8' }
+    case 'neon':
+      return { primary: '#05030a', secondary: '#1a0f2e', accent: '#67e8d0' }
     default:
       return { primary: '#0a1a3a', secondary: '#1a3a6a', accent: '#4a6a9a' }
   }

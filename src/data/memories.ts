@@ -29,7 +29,10 @@ import type { Memory } from '@/types/memory'
  *   - `imageUrl`：图片地址。Vite 下放在 `public/` 里则用根路径，如 `public/memories/a.jpg` → `/memories/a.jpg`。
  *   - `audioUrl`：音频地址，同上；详情页会显示播放按钮。
  *   - `location`：地点标签文案（如城市/景点名），仅展示用。
- *   - `theme`：详情页粒子背景主题：`ocean` | `forest` | `city` | `default`。
+ *   - `theme`：详情页粒子背景主题：
+ *     白天：`sky`（晴空）| `summit`（山野登山）| `sunshine`（暖阳）| `meadow`（草地春光）；
+ *     通用：`ocean` | `forest` | `city` | `default`；
+ *     夜景：`night` | `fireworks` | `moonlight` | `neon`。
  *
  * 编写步骤建议：复制一条现有对象 → 改 `id` → 调 `position` / `orbitRadius` 让节点在球上分散 → 填 `content`。
  */
@@ -58,7 +61,7 @@ export const memories: Memory[] = [
     content: {
       text: '元宵节，我们第一次见面，那天还是满月~\n你很漂亮，可比照片美多了！！！\n你看，那晚的烟花 好美~',
       imageUrl: '/memories/yanhua.jpg',
-      theme: 'city'
+      theme: 'fireworks'
     }
   },
   {
@@ -87,7 +90,7 @@ export const memories: Memory[] = [
       text: '山顶的风景很美，但我只记得你从山脚到山顶中间都没休息过。',
       imageUrl: '/memories/qiguangding.jpg',
       location: '旗冠顶',
-      theme: 'forest'
+      theme: 'summit'
     }
   },
   {

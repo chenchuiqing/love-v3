@@ -1,5 +1,17 @@
 export type MemoryType = 'photo' | 'date' | 'chat' | 'location' | 'music'
-export type ParticleTheme = 'ocean' | 'forest' | 'city' | 'default'
+export type ParticleTheme =
+  | 'ocean'
+  | 'forest'
+  | 'city'
+  | 'default'
+  | 'sky'
+  | 'summit'
+  | 'sunshine'
+  | 'meadow'
+  | 'night'
+  | 'fireworks'
+  | 'moonlight'
+  | 'neon'
 
 export interface MemoryPosition {
   theta: number
