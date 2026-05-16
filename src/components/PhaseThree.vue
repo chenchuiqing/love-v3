@@ -199,7 +199,10 @@ const resizeDrawingCanvas = () => {
   const h = containerRef.value.clientHeight
   drawingCanvasRef.value.width = w
   drawingCanvasRef.value.height = h
-  drawHeartOutline()
+  // 仅第一幕需要爱心引导线；后续幕 resize 时勿重绘，否则会叠在玫瑰背后
+  if (currentAct.value === 1) {
+    drawHeartOutline()
+  }
 }
 
 const drawHeartOutline = () => {
@@ -1372,7 +1375,7 @@ onUnmounted(() => {
     @pointerup="handlePointerUp"
     @pointerleave="handlePointerUp"
   >
-    <canvas ref="drawingCanvasRef" class="drawing-layer" />
+    <canvas v-show="currentAct === 1" ref="drawingCanvasRef" class="drawing-layer" />
     <img ref="photoRef" :src="PHOTO_URL" class="photo-frame" :style="photoStyle" alt="" />
 
     <Transition
