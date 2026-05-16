@@ -29,6 +29,7 @@ const showEnvelopeHint = ref(false)
 const showLetterOverlay = ref(false)
 const typedLines = ref<string[]>(['', '', ''])
 const isEnvelopeOpening = ref(false)
+const isTypingFinished = ref(false)
 
 const showHapticText = ref(false)
 const showSaveBtn = ref(false)
@@ -839,10 +840,13 @@ const openEnvelope = async () => {
     await new Promise(resolve => setTimeout(resolve, 350))
   }
 
-  // 文字停留时间，让她从容看完
-  await new Promise(resolve => setTimeout(resolve, 2500))
+  // 等待用户手动点击继续
+  isTypingFinished.value = true
+}
 
-  // 信纸淡出后进入第四幕
+const closeLetterAndContinue = async () => {
+  if (!isTypingFinished.value) return
+  isTypingFinished.value = false
   showLetterOverlay.value = false
   await new Promise(resolve => setTimeout(resolve, 600))
   await startAct4()
@@ -1430,6 +1434,17 @@ onUnmounted(() => {
     </Transition>
 
     <Transition
+      enter-active-class="transition-opacity duration-700"
+      leave-active-class="transition-opacity duration-300"
+      enter-from-class="opacity-0"
+      leave-to-class="opacity-0"
+    >
+      <div v-if="showLetterOverlay && isTypingFinished" class="continue-action">
+        <button class="continue-btn" @click.stop="closeLetterAndContinue">继续</button>
+      </div>
+    </Transition>
+
+    <Transition
       enter-active-class="transition-opacity duration-300"
       leave-active-class="transition-opacity duration-700"
       enter-from-class="opacity-0"
@@ -1628,6 +1643,33 @@ onUnmounted(() => {
   font-size: 0.82rem;
   letter-spacing: 0.08em;
   color: rgba(140, 90, 50, 0.7);
+}
+
+.continue-action {
+  position: absolute;
+  right: 1.2rem;
+  bottom: 1.2rem;
+  z-index: 20;
+}
+
+.continue-btn {
+  padding: 0.55rem 1.15rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 186, 222, 0.45);
+  background: rgba(30, 8, 33, 0.48);
+  color: rgba(255, 225, 242, 0.96);
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  animation: gentle-pulse 2.4s ease-in-out infinite;
+}
+
+.continue-btn:hover {
+  background: rgba(45, 12, 50, 0.6);
+  border-color: rgba(255, 129, 201, 0.6);
+  box-shadow: 0 0 16px rgba(255, 129, 201, 0.35);
+  transform: translateY(-1px);
 }
 
 .haptic-text {
