@@ -37,42 +37,41 @@ export const memories: Memory[] = [
   {
     id: 'memory-ocean',
     type: 'photo',
-    title: '第一次一起看海',
-    date: '2024.07.12',
+    title: '相识',
+    date: '2026.02.28',
     position: { theta: Math.PI * 0.3, phi: Math.PI * 0.5 },
     orbitRadius: 1,
     color: '#4a90d9',
     content: {
-      text: '那天海风很大，但你的手很暖。',
-      imageUrl: '/memories/ocean.jpg',
-      audioUrl: '/memories/ocean.mp3',
+      text: '"你好，是小平姨给的我你的联系方式，我叫陈垂青。刚加你微信，打个招呼~"\n"哈喽哈喽，我叫陈咏欣"',
       theme: 'ocean'
     }
   },
   {
     id: 'memory-first-date',
     type: 'date',
-    title: '第一次约会',
-    date: '2024.02.14',
+    title: '第一次见面',
+    date: '2026.03.03',
     position: { theta: Math.PI * 0.7, phi: Math.PI * 0.3 },
     orbitRadius: 1.15,
     color: '#e85a71',
     content: {
-      text: '情人节的咖啡馆，你笑着说我点的拿铁太苦了。',
-      imageUrl: '/memories/first-date.jpg',
+      text: '元宵节，我们第一次见面，那天还是满月~\n你很漂亮，可比照片美多了！！！\n你看，那晚的烟花 好美~',
+      imageUrl: '/memories/yanhua.jpg',
       theme: 'city'
     }
   },
   {
     id: 'memory-chat',
     type: 'chat',
-    title: '深夜的聊天记录',
-    date: '2024.03.21',
+    title: '明信片',
+    date: '2026.04.19',
     position: { theta: Math.PI * 1.2, phi: Math.PI * 0.7 },
     orbitRadius: 1,
     color: '#9b59b6',
     content: {
-      text: '"睡了吗？"\n"没有，在想你。"',
+      text: '"字很好看，话也收到了。比起明信片上的字，我更喜欢写字的人。我就当落款是我女朋友了，你未来的旅途，有我！"',
+      imageUrl: '/memories/wushang.jpg',
       theme: 'default'
     }
   },
@@ -80,14 +79,14 @@ export const memories: Memory[] = [
     id: 'memory-mountain',
     type: 'location',
     title: '一起爬过的山',
-    date: '2024.05.01',
+    date: '2026.03.28',
     position: { theta: Math.PI * 1.6, phi: Math.PI * 0.45 },
     orbitRadius: 1.2,
     color: '#2ecc71',
     content: {
-      text: '山顶的风景很美，但我只记得你气喘吁吁却还在笑的样子。',
-      imageUrl: '/memories/mountain.jpg',
-      location: '黄山',
+      text: '山顶的风景很美，但我只记得你从山脚到山顶中间都没休息过。',
+      imageUrl: '/memories/qiguangding.jpg',
+      location: '旗冠顶',
       theme: 'forest'
     }
   },
@@ -95,13 +94,14 @@ export const memories: Memory[] = [
     id: 'memory-song',
     type: 'music',
     title: '我们的歌',
-    date: '2024.06.18',
+    date: '2026.05.12',
     position: { theta: Math.PI * 0.1, phi: Math.PI * 0.8 },
     orbitRadius: 1.1,
     color: '#f39c12',
     content: {
-      text: '每次听到这首歌，都会想起那个夏天的傍晚。',
-      audioUrl: '/memories/our-song.mp3',
+      text: '"你好右转哥，分享一首左转灯给你听"',
+      imageUrl: '/memories/gequ.jpg',
+      audioUrl: '/memories/左转灯.mp3',
       theme: 'default'
     }
   }
