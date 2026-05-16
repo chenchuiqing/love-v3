@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { MeshSurfaceSampler } from 'three/examples/jsm/math/MeshSurfaceSampler.js'
@@ -11,14 +11,30 @@ const emit = defineEmits<{
 
 const PHOTO_URL = '/photo.jpg'
 const CONFESSION_LINES = [
-  '那天你在地铁口等我，手里拿着热可可。',
-  '那一刻我知道，被你记住，是我最大的幸运。',
-  '往后的每一程星海，我都想牵着你走。'
+  '咏欣，很高兴遇见你~',
+  '见字如面。',
+  '其实在写下这些字之前，我心里非常高兴但又伴随着些许失落。高兴的是终于可以把准备了这么长时间的"不能说的秘密"与你见面了，失落的是让你久等了...',
+  '你一直说缺了份给你鲜花与告白，所以，这是一份迟来的告白，我想把之前欠你的、本该属于你的那份仪式感，原原本本地为你补上。',
+  '你常问我你有哪些优点？哪些缺点？我想，真正喜欢一个人，不是去爱一个完美无缺的幻影，而是爱一个真实、立体、鲜活的你。',
+  '在我的眼里，你有数不清的优点。你善良、懂事、为人真诚、待人友善，麻将打得也好。对了，你歌唱的也好听~ 你笑起来的样子，真的非常漂亮。',
+  '但同时，我也看到了你的"小缺点"。我知道你偶尔会犯懒，甚至有的时候，连下雨天你也懒得带伞，总是冒冒失失的。还经常忘带东西，遇到事情的时候会犹豫不决、习惯性拖延。偶尔有些小脾气，偶尔会敏感、会焦虑。但你知道吗？每当看到这些时候的你，我不仅没有半点不耐烦，反而觉得你无比可爱。这些不完美，恰恰让你变得无比真实。它提醒着我，眼前的女孩不是神坛上的雕塑，而是一个需要被好好珍藏、好好保护的宝贝。',
+  '所以，我想认真地告诉你：我喜欢你，喜欢你的全部。',
+  '在这个世界上，人人都在权衡利弊，都在讲究对等，但在你这里，我想给你我全部的偏爱。',
+  '我的偏爱是，无论人群多么拥挤，我的目光总会第一时间落在你身上；是我的"双标"，别人不行的事在你这有无限的特权；是哪怕全世界都要求你懂事、听话、做个成熟的大人，在我这里，你永远可以只做那个被宠溺、可以随时撒娇、不用讲道理的小女孩。',
+  '我不想只参与你的快乐，我更想在那些阴天里，做那个为你撑伞、听你诉苦、给你兜底的人。',
+  '这份告白虽然迟到了，但我对你的爱意永远不会缺席。往后的日子里，不管是晴是雨，我都想陪你一起走。未来的路途，有我！！！'
+]
+
+const LETTER_POSTER_LINES = [
+  CONFESSION_LINES[0],
+  '我喜欢你，喜欢你的全部。',
+  '永远偏向你的，陈垂青'
 ]
 
 const containerRef = ref<HTMLElement | null>(null)
 const drawingCanvasRef = ref<HTMLCanvasElement | null>(null)
 const photoRef = ref<HTMLImageElement | null>(null)
+const letterCardRef = ref<HTMLElement | null>(null)
 const hasInteracted = ref(false)
 const isCollapsing = ref(false)
 const currentAct = ref<1 | 2 | 3 | 4>(1)
@@ -27,7 +43,7 @@ const photoStyle = ref({ width: '0px', height: '0px', opacity: 0 })
 
 const showEnvelopeHint = ref(false)
 const showLetterOverlay = ref(false)
-const typedLines = ref<string[]>(['', '', ''])
+const typedLines = ref<string[]>(CONFESSION_LINES.map(() => ''))
 const isEnvelopeOpening = ref(false)
 const isTypingFinished = ref(false)
 
@@ -776,6 +792,13 @@ const typeLine = (lineIdx: number, text: string, charDelay = 90): Promise<void> 
       i += 1
       typedLines.value[lineIdx] = text.slice(0, i)
       typedLines.value = [...typedLines.value]
+      
+      nextTick(() => {
+        if (letterCardRef.value) {
+          letterCardRef.value.scrollTop = letterCardRef.value.scrollHeight
+        }
+      })
+
       if (i < text.length) {
         setTimeout(tick, charDelay)
       } else {
@@ -834,10 +857,10 @@ const openEnvelope = async () => {
   showLetterOverlay.value = true
   await new Promise(resolve => setTimeout(resolve, 700))
 
-  // 逐行打字机
+  // 逐段打字机
   for (let i = 0; i < CONFESSION_LINES.length; i++) {
-    await typeLine(i, CONFESSION_LINES[i], 110)
-    await new Promise(resolve => setTimeout(resolve, 350))
+    await typeLine(i, CONFESSION_LINES[i], 55)
+    await new Promise(resolve => setTimeout(resolve, 280))
   }
 
   // 等待用户手动点击继续
@@ -1011,11 +1034,11 @@ const handleSavePoster = () => {
   ctx.fillStyle = 'rgba(255, 226, 232, 0.95)'
   ctx.shadowColor = 'rgba(255, 80, 120, 0.5)'
   ctx.shadowBlur = 12
-  const lineHeight = Math.max(22, Math.floor(h * 0.034))
-  const baseY = h - lineHeight * (CONFESSION_LINES.length + 1)
+  const lineHeight = Math.max(20, Math.floor(h * 0.028))
+  const baseY = h - lineHeight * (LETTER_POSTER_LINES.length + 1)
   ctx.font = `${Math.floor(lineHeight * 0.7)}px "PingFang SC", "Microsoft YaHei", serif`
-  for (let i = 0; i < CONFESSION_LINES.length; i++) {
-    ctx.fillText(CONFESSION_LINES[i], w / 2, baseY + i * lineHeight)
+  for (let i = 0; i < LETTER_POSTER_LINES.length; i++) {
+    ctx.fillText(LETTER_POSTER_LINES[i], w / 2, baseY + i * lineHeight)
   }
   ctx.shadowBlur = 0
 
@@ -1184,7 +1207,8 @@ const resetDrawing = () => {
   showHapticText.value = false
   showSaveBtn.value = false
   isEnvelopeOpening.value = false
-  typedLines.value = ['', '', '']
+  isTypingFinished.value = false
+  typedLines.value = CONFESSION_LINES.map(() => '')
   act4RotateState.isDragging = false
   act4RotateState.velocityX = 0
   act4RotateState.velocityY = 0
@@ -1417,10 +1441,10 @@ onUnmounted(() => {
       leave-to-class="opacity-0"
     >
       <div v-if="showLetterOverlay" class="letter-overlay">
-        <div class="letter-card">
+        <div class="letter-card" ref="letterCardRef">
           <div class="letter-header">
             <span class="letter-line"></span>
-            <span class="letter-date">致 你</span>
+            <span class="letter-date">致 咏欣</span>
             <span class="letter-line"></span>
           </div>
           <div class="letter-text">
@@ -1428,7 +1452,11 @@ onUnmounted(() => {
               {{ line }}<span v-if="line && i === typedLines.length - 1" class="cursor">|</span>
             </p>
           </div>
-          <div class="letter-footer">— 永远爱你的人</div>
+          <div v-if="isTypingFinished" class="letter-footer">
+            <p>永远偏向你的，</p>
+            <p>陈垂青</p>
+            <p>2026年5月17日</p>
+          </div>
         </div>
       </div>
     </Transition>
@@ -1585,6 +1613,7 @@ onUnmounted(() => {
 
 .letter-card {
   width: min(420px, 88vw);
+  max-height: min(78vh, 640px);
   padding: 2rem 1.8rem;
   border-radius: 16px;
   background: linear-gradient(155deg, rgba(252, 244, 228, 0.96), rgba(244, 228, 208, 0.92));
@@ -1592,6 +1621,26 @@ onUnmounted(() => {
   box-shadow: 0 24px 72px rgba(0, 0, 0, 0.55), 0 0 32px rgba(255, 196, 120, 0.18);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 220, 180, 0.4);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 自定义滚动条样式 */
+.letter-card::-webkit-scrollbar {
+  width: 6px;
+}
+
+.letter-card::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.letter-card::-webkit-scrollbar-thumb {
+  background: rgba(140, 90, 50, 0.2);
+  border-radius: 4px;
+}
+
+.letter-card::-webkit-scrollbar-thumb:hover {
+  background: rgba(140, 90, 50, 0.4);
 }
 
 .letter-header {
@@ -1615,10 +1664,10 @@ onUnmounted(() => {
 
 .letter-text {
   font-family: 'KaiTi', 'STKaiti', 'PingFang SC', serif;
-  font-size: 1.05rem;
-  line-height: 2;
+  font-size: 0.98rem;
+  line-height: 1.85;
   letter-spacing: 0.05em;
-  min-height: 6.3em;
+  min-height: 4em;
 }
 
 .letter-paragraph {
@@ -1643,6 +1692,10 @@ onUnmounted(() => {
   font-size: 0.82rem;
   letter-spacing: 0.08em;
   color: rgba(140, 90, 50, 0.7);
+}
+
+.letter-footer p {
+  margin: 0.15em 0;
 }
 
 .continue-action {
