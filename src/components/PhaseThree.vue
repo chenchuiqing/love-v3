@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { MeshSurfaceSampler } from 'three/examples/jsm/math/MeshSurfaceSampler.js'
 import gsap from 'gsap'
+import html2canvas from 'html2canvas'
 
 const emit = defineEmits<{
   (e: 'act1Complete'): void
@@ -23,12 +24,6 @@ const CONFESSION_LINES = [
   '我的偏爱是，无论人群多么拥挤，我的目光总会第一时间落在你身上；是我的"双标"，别人不行的事在你这有无限的特权；是哪怕全世界都要求你懂事、听话、做个成熟的大人，在我这里，你永远可以只做那个被宠溺、可以随时撒娇、不用讲道理的小女孩。',
   '我不想只参与你的快乐，我更想在那些阴天里，做那个为你撑伞、听你诉苦、给你兜底的人。',
   '这份告白虽然迟到了，但我对你的爱意永远不会缺席。往后的日子里，不管是晴是雨，我都想陪你一起走。未来的路途，有我！！！'
-]
-
-const LETTER_POSTER_LINES = [
-  CONFESSION_LINES[0],
-  '我喜欢你，喜欢你的全部。',
-  '永远偏向你的，陈垂青'
 ]
 
 const containerRef = ref<HTMLElement | null>(null)
@@ -991,16 +986,20 @@ const triggerRoseHaptic = () => {
   }, 2000)
 }
 
-const handleSavePoster = () => {
+const handleSavePoster = async () => {
   if (!renderer || !containerRef.value) return
   const w = containerRef.value.clientWidth
   const h = containerRef.value.clientHeight
+  const dpr = Math.min(window.devicePixelRatio || 1, 2)
 
   const out = document.createElement('canvas')
-  out.width = w
-  out.height = h
+  out.width = w * dpr
+  out.height = h * dpr
   const ctx = out.getContext('2d')
   if (!ctx) return
+  
+  // 统一按设备像素比缩放上下文，后续坐标均按逻辑像素(w, h)计算
+  ctx.scale(dpr, dpr)
 
   // 背景：与场景同色，避免黑底硬边
   ctx.fillStyle = '#000010'
@@ -1024,27 +1023,83 @@ const handleSavePoster = () => {
     ctx.save()
     ctx.textAlign = 'right'
     ctx.fillStyle = 'rgba(255, 220, 230, 0.65)'
+    // 使用更高清的字体
     ctx.font = `${Math.max(11, Math.floor(w * 0.012))}px "PingFang SC", "Microsoft YaHei", serif`
     ctx.fillText('— 由你亲手画下', w - margin, margin + targetH + 18)
     ctx.restore()
   }
 
-  // 在底部叠加告白文字
-  ctx.textAlign = 'center'
-  ctx.fillStyle = 'rgba(255, 226, 232, 0.95)'
-  ctx.shadowColor = 'rgba(255, 80, 120, 0.5)'
-  ctx.shadowBlur = 12
-  const lineHeight = Math.max(20, Math.floor(h * 0.028))
-  const baseY = h - lineHeight * (LETTER_POSTER_LINES.length + 1)
-  ctx.font = `${Math.floor(lineHeight * 0.7)}px "PingFang SC", "Microsoft YaHei", serif`
-  for (let i = 0; i < LETTER_POSTER_LINES.length; i++) {
-    ctx.fillText(LETTER_POSTER_LINES[i], w / 2, baseY + i * lineHeight)
+  // 动态生成信纸卡片的离线 DOM 并绘制到图片左侧
+  const letterDiv = document.createElement('div')
+  letterDiv.innerHTML = `
+    <div style="
+      width: 480px;
+      padding: 2.5rem 2.2rem;
+      border-radius: 20px;
+      background: linear-gradient(155deg, rgba(252, 244, 228, 0.96), rgba(244, 228, 208, 0.92));
+      color: #5a3a2a;
+      border: 1.5px solid rgba(255, 220, 180, 0.4);
+      font-family: 'KaiTi', 'STKaiti', 'PingFang SC', serif;
+      box-sizing: border-box;
+    ">
+      <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 1.6rem;">
+        <span style="flex: 1; height: 1.5px; background: linear-gradient(90deg, transparent, rgba(140, 90, 50, 0.4), transparent);"></span>
+        <span style="font-size: 0.95rem; letter-spacing: 0.3em; color: rgba(140, 90, 50, 0.85); font-family: sans-serif; font-weight: bold;">致 咏欣</span>
+        <span style="flex: 1; height: 1.5px; background: linear-gradient(90deg, transparent, rgba(140, 90, 50, 0.4), transparent);"></span>
+      </div>
+      <div style="font-size: 1.15rem; line-height: 1.9; letter-spacing: 0.06em;">
+        ${CONFESSION_LINES.map(line => `<p style="margin: 0 0 0.5em 0;">${line}</p>`).join('')}
+      </div>
+      <div style="margin-top: 1.8rem; text-align: right; font-size: 0.95rem; letter-spacing: 0.08em; color: rgba(140, 90, 50, 0.7); font-family: sans-serif; font-weight: bold;">
+        <p style="margin: 0.2em 0;">永远偏向你的，</p>
+        <p style="margin: 0.2em 0;">陈垂青</p>
+        <p style="margin: 0.2em 0;">2026年5月17日</p>
+      </div>
+    </div>
+  `
+  letterDiv.style.position = 'fixed'
+  letterDiv.style.left = '-9999px'
+  letterDiv.style.top = '0'
+  document.body.appendChild(letterDiv)
+
+  try {
+    const letterCanvas = await html2canvas(letterDiv.firstElementChild as HTMLElement, {
+      backgroundColor: 'transparent',
+      scale: 3 // 设置更大的缩放倍数以保证文字高清
+    })
+    
+    // 计算缩放与位置，让它显示在屏幕左侧
+    const isLandscape = w > h
+    const maxLetterH = h * 0.85
+    const maxLetterW = isLandscape ? Math.max(300, w * 0.38) : w * 0.85
+    
+    const letterRatio = letterCanvas.height / letterCanvas.width
+    let targetW = maxLetterW
+    let targetH = targetW * letterRatio
+    
+    if (targetH > maxLetterH) {
+      targetH = maxLetterH
+      targetW = targetH / letterRatio
+    }
+    
+    const drawX = isLandscape ? Math.max(30, w * 0.05) : (w - targetW) / 2
+    const drawY = (h - targetH) / 2
+    
+    ctx.save()
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.55)'
+    ctx.shadowBlur = 40
+    ctx.shadowOffsetY = 16
+    ctx.drawImage(letterCanvas, drawX, drawY, targetW, targetH)
+    ctx.restore()
+  } catch (e) {
+    console.error('Failed to capture letter poster:', e)
+  } finally {
+    document.body.removeChild(letterDiv)
   }
-  ctx.shadowBlur = 0
 
   const link = document.createElement('a')
   link.download = 'love-letter.png'
-  link.href = out.toDataURL('image/png')
+  link.href = out.toDataURL('image/png', 1.0)
   link.click()
 }
 
