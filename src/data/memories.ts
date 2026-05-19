@@ -79,6 +79,19 @@ export const memories: Memory[] = [
     }
   },
   {
+    id: 'memory-first-kiss',
+    type: 'date',
+    title: '第一次亲亲',
+    date: '2026.04.27',
+    position: { theta: Math.PI * 1.45, phi: Math.PI * 0.52 },
+    orbitRadius: 1.1,
+    color: '#ff6b9d',
+    content: {
+      text: '4月27日，我们的第一次亲亲。\n是我的初吻~',
+      theme: 'moonlight'
+    }
+  },
+  {
     id: 'memory-mountain',
     type: 'location',
     title: '一起爬过的山',
@@ -91,6 +104,19 @@ export const memories: Memory[] = [
       imageUrl: '/memories/qiguangding.jpg',
       location: '旗冠顶',
       theme: 'summit'
+    }
+  },
+  {
+    id: 'memory-unforgettable-night',
+    type: 'date',
+    title: '难忘的夜晚',
+    date: '2026.05.09',
+    position: { theta: Math.PI * 0.85, phi: Math.PI * 0.62 },
+    orbitRadius: 1.15,
+    color: '#c77dff',
+    content: {
+      text: '5月9日的夜，很难忘。\n永远相信美好的事情即将发生！',
+      theme: 'night'
     }
   },
   {
