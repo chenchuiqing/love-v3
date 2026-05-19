@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import * as THREE from 'three'
 import type { Memory } from '@/types/memory'
+import { useMusicPlayerStore } from '@/stores/musicPlayer'
 
 const props = defineProps<{
   memory: Memory
@@ -13,11 +14,18 @@ const emit = defineEmits<{
 
 const containerRef = ref<HTMLElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
-const audioRef = ref<HTMLAudioElement | null>(null)
 
 const displayedText = ref('')
 const isImageLoaded = ref(false)
-const isPlaying = ref(false)
+
+const musicPlayer = useMusicPlayerStore()
+
+const isCurrentPlaying = computed(
+  () =>
+    !!props.memory.content.audioUrl &&
+    musicPlayer.isCurrentTrack(props.memory.content.audioUrl) &&
+    musicPlayer.isPlaying
+)
 
 let scene: THREE.Scene
 let camera: THREE.PerspectiveCamera
@@ -192,19 +200,15 @@ const handleImageLoad = () => {
   isImageLoaded.value = true
 }
 
-const toggleAudio = () => {
-  if (!audioRef.value) return
+const toggleAudio = async () => {
+  const url = props.memory.content.audioUrl
+  if (!url) return
 
-  if (isPlaying.value) {
-    audioRef.value.pause()
+  if (musicPlayer.isCurrentTrack(url)) {
+    await musicPlayer.toggle()
   } else {
-    audioRef.value.play()
+    await musicPlayer.play(url, props.memory.title, props.memory.content.imageUrl)
   }
-  isPlaying.value = !isPlaying.value
-}
-
-const handleAudioEnded = () => {
-  isPlaying.value = false
 }
 
 const handleClose = () => {
@@ -222,8 +226,7 @@ const handleResize = () => {
 watch(() => props.memory, () => {
   displayedText.value = ''
   isImageLoaded.value = false
-  isPlaying.value = false
-  
+
   setTimeout(() => {
     startTypewriter()
   }, 500)
@@ -241,10 +244,6 @@ onMounted(() => {
 onUnmounted(() => {
   cancelAnimationFrame(animationId)
   window.removeEventListener('resize', handleResize)
-
-  if (audioRef.value) {
-    audioRef.value.pause()
-  }
 
   if (renderer) {
     renderer.dispose()
@@ -289,18 +288,13 @@ onUnmounted(() => {
       </div>
 
       <div v-if="memory.content.audioUrl" class="audio-controls">
-        <audio
-          ref="audioRef"
-          :src="memory.content.audioUrl"
-          @ended="handleAudioEnded"
-        />
         <button
           class="play-button"
           @click="toggleAudio"
         >
-          <span v-if="isPlaying">⏸</span>
+          <span v-if="isCurrentPlaying">⏸</span>
           <span v-else>▶</span>
-          {{ isPlaying ? '暂停' : '播放' }}
+          {{ isCurrentPlaying ? '暂停' : '播放' }}
         </button>
       </div>
 

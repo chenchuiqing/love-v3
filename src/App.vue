@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import PhaseOne from './components/PhaseOne.vue';
 import PhaseTwo from './components/PhaseTwo.vue';
 import PhaseThree from './components/PhaseThree.vue';
+import FloatingMusicPlayer from './components/FloatingMusicPlayer.vue';
 
 const currentPhase = ref(1);
 const isTransitioning = ref(false);
@@ -88,6 +89,9 @@ onUnmounted(() => {
     <Transition name="phase-fade">
       <PhaseThree v-if="currentPhase === 3" @act1-complete="handleAct1Complete" />
     </Transition>
+
+    <!-- 全局浮动音乐播放器 -->
+    <FloatingMusicPlayer />
   </main>
 </template>
 
