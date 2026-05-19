@@ -5,6 +5,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { MeshSurfaceSampler } from 'three/examples/jsm/math/MeshSurfaceSampler.js'
 import gsap from 'gsap'
 import html2canvas from 'html2canvas'
+import { Fireworks } from 'fireworks-js'
 
 const emit = defineEmits<{
   (e: 'act1Complete'): void
@@ -28,6 +29,7 @@ const CONFESSION_LINES = [
 
 const containerRef = ref<HTMLElement | null>(null)
 const drawingCanvasRef = ref<HTMLCanvasElement | null>(null)
+const fireworksCanvas = ref<HTMLCanvasElement | null>(null)
 const photoRef = ref<HTMLImageElement | null>(null)
 const letterCardRef = ref<HTMLElement | null>(null)
 const hasInteracted = ref(false)
@@ -64,6 +66,8 @@ let act2BreathingTime = 0
 let act4BreathingTime = 0
 let shapeHintTimer: ReturnType<typeof setTimeout> | null = null
 let hapticTextTimer: ReturnType<typeof setTimeout> | null = null
+let fireworksInstance: Fireworks | null = null
+let fireworksStopTimer: ReturnType<typeof setTimeout> | null = null
 
 const PARTICLE_COUNT = 15000
 const pathPoints: THREE.Vector2[] = []
@@ -962,6 +966,31 @@ const startAct4 = async () => {
     ease: 'power2.out'
   })
 
+  // 背景烟花助兴：仅在第四幕玫瑰成形后短暂绽放
+  if (fireworksCanvas.value && !fireworksInstance) {
+    fireworksInstance = new Fireworks(fireworksCanvas.value, {
+      rocketsPoint: { min: 10, max: 90 },
+      hue: { min: 320, max: 360 },
+      delay: { min: 18, max: 36 },
+      acceleration: 1.02,
+      friction: 0.97,
+      gravity: 1.5,
+      particles: 90,
+      explosion: 6,
+      autoresize: true,
+      brightness: { min: 55, max: 80 },
+      decay: { min: 0.015, max: 0.03 },
+      flickering: 50,
+      intensity: 22,
+      traceSpeed: 8,
+      lineWidth: { explosion: { min: 1, max: 3 }, trace: { min: 1, max: 2 } }
+    })
+    fireworksInstance.start()
+    fireworksStopTimer = setTimeout(() => {
+      fireworksInstance?.waitStop()
+    }, 5000)
+  }
+
   // 延迟显示保存按钮
   setTimeout(() => {
     showSaveBtn.value = true
@@ -1436,6 +1465,14 @@ onUnmounted(() => {
   cancelAnimationFrame(animationId)
   window.removeEventListener('resize', handleResize)
   if (shapeHintTimer) clearTimeout(shapeHintTimer)
+  if (fireworksStopTimer) {
+    clearTimeout(fireworksStopTimer)
+    fireworksStopTimer = null
+  }
+  if (fireworksInstance) {
+    fireworksInstance.stop(true)
+    fireworksInstance = null
+  }
 
   if (renderer) {
     renderer.dispose()
@@ -1459,6 +1496,7 @@ onUnmounted(() => {
     @pointerleave="handlePointerUp"
   >
     <canvas v-show="currentAct === 1" ref="drawingCanvasRef" class="drawing-layer" />
+    <canvas ref="fireworksCanvas" class="fireworks-canvas" />
     <img ref="photoRef" :src="PHOTO_URL" class="photo-frame" :style="photoStyle" alt="" />
 
     <Transition
@@ -1565,6 +1603,15 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   pointer-events: none;
+}
+
+.fireworks-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
 }
 
 .photo-frame {
