@@ -46,6 +46,8 @@ const isTypingFinished = ref(false)
 
 const showHapticText = ref(false)
 const showSaveBtn = ref(false)
+const showFireworksBtn = ref(false)
+const fireworksOn = ref(false)
 
 let scene: THREE.Scene
 let camera: THREE.PerspectiveCamera
@@ -67,7 +69,43 @@ let act4BreathingTime = 0
 let shapeHintTimer: ReturnType<typeof setTimeout> | null = null
 let hapticTextTimer: ReturnType<typeof setTimeout> | null = null
 let fireworksInstance: Fireworks | null = null
-let fireworksStopTimer: ReturnType<typeof setTimeout> | null = null
+
+const FIREWORKS_OPTIONS = {
+  rocketsPoint: { min: 10, max: 90 },
+  hue: { min: 320, max: 360 },
+  delay: { min: 18, max: 36 },
+  acceleration: 1.02,
+  friction: 0.97,
+  gravity: 1.5,
+  particles: 90,
+  explosion: 6,
+  autoresize: true,
+  brightness: { min: 55, max: 80 },
+  decay: { min: 0.015, max: 0.03 },
+  flickering: 50,
+  intensity: 22,
+  traceSpeed: 8,
+  lineWidth: { explosion: { min: 1, max: 3 }, trace: { min: 1, max: 2 } }
+}
+
+const ensureFireworks = (): Fireworks | null => {
+  if (fireworksInstance) return fireworksInstance
+  if (!fireworksCanvas.value) return null
+  fireworksInstance = new Fireworks(fireworksCanvas.value, FIREWORKS_OPTIONS)
+  return fireworksInstance
+}
+
+const toggleFireworks = () => {
+  const instance = ensureFireworks()
+  if (!instance) return
+  if (instance.isRunning) {
+    instance.stop()
+    fireworksOn.value = false
+  } else {
+    instance.start()
+    fireworksOn.value = true
+  }
+}
 
 const PARTICLE_COUNT = 15000
 const pathPoints: THREE.Vector2[] = []
@@ -966,30 +1004,13 @@ const startAct4 = async () => {
     ease: 'power2.out'
   })
 
-  // 背景烟花助兴：仅在第四幕玫瑰成形后短暂绽放
-  if (fireworksCanvas.value && !fireworksInstance) {
-    fireworksInstance = new Fireworks(fireworksCanvas.value, {
-      rocketsPoint: { min: 10, max: 90 },
-      hue: { min: 320, max: 360 },
-      delay: { min: 18, max: 36 },
-      acceleration: 1.02,
-      friction: 0.97,
-      gravity: 1.5,
-      particles: 90,
-      explosion: 6,
-      autoresize: true,
-      brightness: { min: 55, max: 80 },
-      decay: { min: 0.015, max: 0.03 },
-      flickering: 50,
-      intensity: 22,
-      traceSpeed: 8,
-      lineWidth: { explosion: { min: 1, max: 3 }, trace: { min: 1, max: 2 } }
-    })
-    fireworksInstance.start()
-    fireworksStopTimer = setTimeout(() => {
-      fireworksInstance?.waitStop()
-    }, 5000)
+  // 背景烟花助兴：默认点燃一次，并展示控制按钮供手动启停
+  const instance = ensureFireworks()
+  if (instance && !instance.isRunning) {
+    instance.start()
+    fireworksOn.value = true
   }
+  showFireworksBtn.value = true
 
   // 延迟显示保存按钮
   setTimeout(() => {
@@ -1465,10 +1486,6 @@ onUnmounted(() => {
   cancelAnimationFrame(animationId)
   window.removeEventListener('resize', handleResize)
   if (shapeHintTimer) clearTimeout(shapeHintTimer)
-  if (fireworksStopTimer) {
-    clearTimeout(fireworksStopTimer)
-    fireworksStopTimer = null
-  }
   if (fireworksInstance) {
     fireworksInstance.stop(true)
     fireworksInstance = null
@@ -1581,6 +1598,22 @@ onUnmounted(() => {
       leave-to-class="opacity-0"
     >
       <button v-if="showSaveBtn" class="save-btn" @click="handleSavePoster">留住这一刻</button>
+    </Transition>
+
+    <Transition
+      enter-active-class="transition-opacity duration-700"
+      leave-active-class="transition-opacity duration-300"
+      enter-from-class="opacity-0"
+      leave-to-class="opacity-0"
+    >
+      <button
+        v-if="showFireworksBtn"
+        class="fireworks-btn"
+        :class="{ 'is-on': fireworksOn }"
+        @click="toggleFireworks"
+      >
+        {{ fireworksOn ? '熄灭烟花' : '点燃烟花' }}
+      </button>
     </Transition>
 
     <button v-if="currentAct === 1" class="reset-btn" @click="resetDrawing">重新画</button>
@@ -1864,5 +1897,34 @@ onUnmounted(() => {
 .save-btn:hover {
   box-shadow: 0 0 18px rgba(255, 120, 170, 0.5);
   transform: translateY(-1px);
+}
+
+.fireworks-btn {
+  position: absolute;
+  left: 1.2rem;
+  bottom: 1.2rem;
+  z-index: 20;
+  padding: 0.55rem 1.15rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 220, 160, 0.5);
+  background: rgba(40, 20, 8, 0.55);
+  color: rgba(255, 240, 220, 0.96);
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: 240ms ease;
+}
+
+.fireworks-btn:hover {
+  box-shadow: 0 0 18px rgba(255, 196, 120, 0.5);
+  transform: translateY(-1px);
+}
+
+.fireworks-btn.is-on {
+  border-color: rgba(255, 180, 200, 0.6);
+  background: rgba(50, 10, 24, 0.6);
+  color: rgba(255, 226, 236, 0.98);
+  box-shadow: 0 0 14px rgba(255, 130, 170, 0.35);
 }
 </style>
