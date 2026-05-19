@@ -44,7 +44,7 @@ export const memories: Memory[] = [
     date: '2026.02.28',
     position: { theta: Math.PI * 0.3, phi: Math.PI * 0.5 },
     orbitRadius: 1,
-    color: '#4a90d9',
+    color: '#42a5f5',
     content: {
       text: '"你好，是小平姨给的我你的联系方式，我叫陈垂青。刚加你微信，打个招呼~"\n"哈喽哈喽，我叫陈咏欣"',
       theme: 'ocean'
@@ -57,7 +57,7 @@ export const memories: Memory[] = [
     date: '2026.03.03',
     position: { theta: Math.PI * 0.7, phi: Math.PI * 0.3 },
     orbitRadius: 1.15,
-    color: '#e85a71',
+    color: '#ef5350',
     content: {
       text: '元宵节，我们第一次见面，那天还是满月~\n你很漂亮，可比照片美多了！！！\n你看，那晚的烟花 好美~',
       imageUrl: '/memories/yanhua.jpg',
@@ -71,7 +71,7 @@ export const memories: Memory[] = [
     date: '2026.04.19',
     position: { theta: Math.PI * 1.2, phi: Math.PI * 0.7 },
     orbitRadius: 1,
-    color: '#9b59b6',
+    color: '#26c6da',
     content: {
       text: '"字很好看，话也收到了。比起明信片上的字，我更喜欢写字的人。我就当落款是我女朋友了，你未来的旅途，有我！"',
       imageUrl: '/memories/wushang.jpg',
@@ -85,7 +85,7 @@ export const memories: Memory[] = [
     date: '2026.04.27',
     position: { theta: Math.PI * 1.45, phi: Math.PI * 0.52 },
     orbitRadius: 1.1,
-    color: '#ff6b9d',
+    color: '#ec407a',
     content: {
       text: '4月27日，我们的第一次亲亲。\n是我的初吻~',
       theme: 'moonlight'
@@ -98,7 +98,7 @@ export const memories: Memory[] = [
     date: '2026.03.28',
     position: { theta: Math.PI * 1.6, phi: Math.PI * 0.45 },
     orbitRadius: 1.2,
-    color: '#2ecc71',
+    color: '#66bb6a',
     content: {
       text: '山顶的风景很美，但我只记得你从山脚到山顶中间都没休息过。',
       imageUrl: '/memories/qiguangding.jpg',
@@ -113,7 +113,7 @@ export const memories: Memory[] = [
     date: '2026.05.09',
     position: { theta: Math.PI * 0.85, phi: Math.PI * 0.62 },
     orbitRadius: 1.15,
-    color: '#c77dff',
+    color: '#5c6bc0',
     content: {
       text: '5月9日的夜，很难忘。\n永远相信美好的事情即将发生！',
       theme: 'night'
@@ -126,7 +126,7 @@ export const memories: Memory[] = [
     date: '2026.05.12',
     position: { theta: Math.PI * 0.1, phi: Math.PI * 0.8 },
     orbitRadius: 1.1,
-    color: '#f39c12',
+    color: '#ffb300',
     content: {
       text: '"你好右转哥，分享一首左转灯给你听"',
       imageUrl: '/memories/gequ.jpg',
