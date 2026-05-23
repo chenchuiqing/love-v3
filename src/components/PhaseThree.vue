@@ -45,7 +45,6 @@ const typedLines = ref<string[]>(CONFESSION_LINES.map(() => ''))
 const isEnvelopeOpening = ref(false)
 const isTypingFinished = ref(false)
 
-const showHapticText = ref(false)
 const showSaveBtn = ref(false)
 const showFireworksBtn = ref(false)
 const fireworksOn = ref(false)
@@ -68,7 +67,6 @@ let firstPathPoint: THREE.Vector2 | null = null
 let act2BreathingTime = 0
 let act4BreathingTime = 0
 let shapeHintTimer: ReturnType<typeof setTimeout> | null = null
-let hapticTextTimer: ReturnType<typeof setTimeout> | null = null
 let fireworksInstance: Fireworks | null = null
 let fireworksLaunchEndTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -808,6 +806,68 @@ const tweenParticleColors = (target: [number, number, number], duration: number)
   })
 }
 
+/**
+ * HSL → RGB（H: 0~360，S/L: 0~1，返回每分量 0~1）。
+ * 内部复用 THREE.Color.setHSL 以保证色彩空间一致性。
+ */
+const _hslColorCache = new THREE.Color()
+const hslToRgb = (h: number, s: number, l: number): [number, number, number] => {
+  _hslColorCache.setHSL(((h % 360) + 360) % 360 / 360, s, l)
+  return [_hslColorCache.r, _hslColorCache.g, _hslColorCache.b]
+}
+
+/**
+ * 基于粒子 Y 坐标生成七彩目标颜色（每粒子独立）。
+ * 色相从底部红 → 顶部紫，避免首尾相接造成色环重复。
+ */
+const buildRainbowColors = (positions: Float32Array): Float32Array => {
+  const colors = new Float32Array(PARTICLE_COUNT * 3)
+  let minY = Infinity
+  let maxY = -Infinity
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    const y = positions[i * 3 + 1]
+    if (y < minY) minY = y
+    if (y > maxY) maxY = y
+  }
+  const range = maxY - minY || 1
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    const y = positions[i * 3 + 1]
+    const t = (y - minY) / range
+    const hue = t * 300
+    const [r, g, b] = hslToRgb(hue, 0.85, 0.62)
+    colors[i * 3] = r
+    colors[i * 3 + 1] = g
+    colors[i * 3 + 2] = b
+  }
+  return colors
+}
+
+/**
+ * 粒子颜色"按粒子"过渡到目标颜色数组（每粒子独立目标 RGB）。
+ */
+const tweenParticleColorsPerParticle = (targetColors: Float32Array, duration: number) => {
+  const startColors = new Float32Array(particleColors)
+  const progress = { value: 0 }
+  return new Promise<void>(resolve => {
+    gsap.to(progress, {
+      value: 1,
+      duration,
+      ease: 'power2.inOut',
+      onUpdate: () => {
+        const p = progress.value
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          const idx = i * 3
+          particleColors[idx] = THREE.MathUtils.lerp(startColors[idx], targetColors[idx], p)
+          particleColors[idx + 1] = THREE.MathUtils.lerp(startColors[idx + 1], targetColors[idx + 1], p)
+          particleColors[idx + 2] = THREE.MathUtils.lerp(startColors[idx + 2], targetColors[idx + 2], p)
+        }
+        ;(particleGeometry.attributes.color as THREE.BufferAttribute).needsUpdate = true
+      },
+      onComplete: () => resolve()
+    })
+  })
+}
+
 const startAct3 = async () => {
   currentAct.value = 3
   act2BasePositions = null
@@ -948,12 +1008,14 @@ const closeLetterAndContinue = async () => {
   if (!isTypingFinished.value) return
   isTypingFinished.value = false
   showLetterOverlay.value = false
+  showEnvelopeHint.value = false
   await new Promise(resolve => setTimeout(resolve, 600))
   await startAct4()
 }
 
 const startAct4 = async () => {
   currentAct.value = 4
+  showEnvelopeHint.value = false
   envelopeKindArr = null
 
   // 先导粒子：从信封中心螺旋升起
@@ -993,8 +1055,8 @@ const startAct4 = async () => {
     }
   })
 
-  // 同步进行：粒子颜色由暖金过渡到深红
-  tweenParticleColors([0.95, 0.1, 0.18], 1.8)
+  // 同步进行：粒子颜色由暖金过渡到浅白（汇聚成形的纯净感），稍后再绽放为七彩
+  tweenParticleColors([1.0, 0.95, 0.9], 1.8)
 
   // 计算玫瑰目标
   const roseTargetsLocal = await loadRoseModelTargets()
@@ -1044,6 +1106,9 @@ const startAct4 = async () => {
     ease: 'power2.out'
   })
 
+  // 七彩绽放：基于粒子最终位置（Y 轴）映射七彩，平滑过渡
+  tweenParticleColorsPerParticle(buildRainbowColors(roseTargetsLocal), 1.5)
+
   // 背景烟花助兴：默认发射 3 秒，已升空的烟花炸完后再停
   const instance = ensureFireworks()
   if (instance && !instance.isRunning) {
@@ -1076,11 +1141,6 @@ const triggerRoseHaptic = () => {
       // ignore
     }
   }
-  showHapticText.value = true
-  if (hapticTextTimer) clearTimeout(hapticTextTimer)
-  hapticTextTimer = setTimeout(() => {
-    showHapticText.value = false
-  }, 2000)
 }
 
 const handleSavePoster = async () => {
@@ -1356,7 +1416,6 @@ const resetDrawing = () => {
   heartSnapshot = null
   showEnvelopeHint.value = false
   showLetterOverlay.value = false
-  showHapticText.value = false
   showSaveBtn.value = false
   isEnvelopeOpening.value = false
   isTypingFinished.value = false
@@ -1584,7 +1643,7 @@ onUnmounted(() => {
       enter-from-class="opacity-0"
       leave-to-class="opacity-0"
     >
-      <p v-if="showEnvelopeHint && !showLetterOverlay" class="envelope-hint">
+      <p v-if="currentAct === 3 && showEnvelopeHint && !showLetterOverlay" class="envelope-hint">
         轻轻滑开，看看里面
       </p>
     </Transition>
@@ -1625,15 +1684,6 @@ onUnmounted(() => {
       <div v-if="showLetterOverlay && isTypingFinished" class="continue-action">
         <button class="continue-btn" @click.stop="closeLetterAndContinue">继续</button>
       </div>
-    </Transition>
-
-    <Transition
-      enter-active-class="transition-opacity duration-300"
-      leave-active-class="transition-opacity duration-700"
-      enter-from-class="opacity-0"
-      leave-to-class="opacity-0"
-    >
-      <p v-if="showHapticText" class="haptic-text">我的心，始终随你而动。</p>
     </Transition>
 
     <Transition
@@ -1918,23 +1968,6 @@ onUnmounted(() => {
   border-color: rgba(255, 129, 201, 0.6);
   box-shadow: 0 0 16px rgba(255, 129, 201, 0.35);
   transform: translateY(-1px);
-}
-
-.haptic-text {
-  position: absolute;
-  left: 50%;
-  top: 12%;
-  transform: translateX(-50%);
-  margin: 0;
-  padding: 0.55rem 1.4rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 150, 170, 0.45);
-  background: rgba(50, 6, 18, 0.55);
-  color: rgba(255, 220, 230, 0.96);
-  font-size: 0.88rem;
-  letter-spacing: 0.08em;
-  text-shadow: 0 0 14px rgba(255, 80, 120, 0.55);
-  white-space: nowrap;
 }
 
 .save-btn {
