@@ -17,6 +17,7 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 
 const displayedText = ref('')
 const isImageLoaded = ref(false)
+const isPortraitImage = ref(false)
 
 const musicPlayer = useMusicPlayerStore()
 
@@ -196,7 +197,9 @@ const startTypewriter = () => {
   }, 80)
 }
 
-const handleImageLoad = () => {
+const handleImageLoad = (e: Event) => {
+  const img = e.target as HTMLImageElement
+  isPortraitImage.value = img.naturalHeight > img.naturalWidth
   isImageLoaded.value = true
 }
 
@@ -226,6 +229,7 @@ const handleResize = () => {
 watch(() => props.memory, () => {
   displayedText.value = ''
   isImageLoaded.value = false
+  isPortraitImage.value = false
 
   setTimeout(() => {
     startTypewriter()
@@ -268,7 +272,11 @@ onUnmounted(() => {
         {{ memory.title }}
       </h2>
 
-      <div v-if="memory.content.imageUrl" class="image-container">
+      <div
+        v-if="memory.content.imageUrl"
+        class="image-container"
+        :class="{ 'is-portrait': isPortraitImage }"
+      >
         <img
           :src="memory.content.imageUrl"
           :alt="memory.title"
@@ -360,17 +368,41 @@ onUnmounted(() => {
 .image-container {
   width: 100%;
   max-width: 400px;
-  aspect-ratio: 4/3;
+  display: flex;
+  justify-content: center;
   border-radius: 1rem;
-  overflow: hidden;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.image-container img {
+/* 竖图：固定 4:3 画框，裁掉上下多余部分 */
+.image-container.is-portrait {
+  display: block;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+}
+
+.image-container.is-portrait img {
   width: 100%;
   height: 100%;
+  max-width: none;
+  max-height: none;
   object-fit: cover;
+  border-radius: 0;
+}
+
+/* 横图 / 方图：完整显示，不裁切 */
+.image-container:not(.is-portrait) img {
+  display: block;
+  max-width: 100%;
+  max-height: min(45vh, 360px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 1rem;
+}
+
+.image-container img {
   opacity: 0;
   transition: opacity 0.5s ease;
 }
