@@ -44,7 +44,9 @@ let starfieldPoints: THREE.Points
 let planetPoints: THREE.Points
 let orbitPoints: THREE.Points
 let nodeSprites: THREE.Sprite[] = []
+let nodeWrappers: THREE.Group[] = []
 let coreSprite: THREE.Sprite | null = null
+let coreWrapper: THREE.Group | null = null
 let raycaster: THREE.Raycaster
 let mouse: THREE.Vector2
 let corePulseTween: gsap.core.Tween | null = null
@@ -69,11 +71,23 @@ let previousMousePosition = { x: 0, y: 0 }
 let rotationVelocity = { x: 0, y: 0 }
 let hoveredSprite: THREE.Sprite | null = null
 
+const activePointers = new Map<number, { x: number; y: number }>()
+let isPinching = false
+let lastPinchDistance = 0
+let suppressNextClick = false
+
 const PLANET_PARTICLE_COUNT = 35000
 const ORBIT_PARTICLE_COUNT = 5000
 const STARFIELD_PARTICLE_COUNT = 3000
 const PLANET_RADIUS = 1.5
 const INITIAL_CAMERA_Z = 5
+/** 最近：贴近球面浏览密集记忆点 */
+const MIN_CAMERA_Z = 1.12
+/** 最远：俯瞰整颗星球（适合上百个记忆点） */
+const MAX_CAMERA_Z = 22
+/** 拉近时标记几乎保持屏幕像素大小；拉远时指数 < 1 使标记缩小成概览点 */
+const MARKER_COMPENSATION_NEAR = 1
+const MARKER_COMPENSATION_FAR = 0.52
 const CORE_ACTIVATE_THRESHOLD = 3
 const VISITED_NODE_SCALE = 0.19
 const VISITED_NODE_HOVER_SCALE = 0.24
@@ -345,12 +359,16 @@ const createMemoryNodes = () => {
     })
 
     const sprite = new THREE.Sprite(material)
-    sprite.position.copy(position)
     sprite.scale.set(0.25, 0.25, 1)
     sprite.userData = { memory, visited: false }
 
+    const wrapper = new THREE.Group()
+    wrapper.position.copy(position)
+    wrapper.add(sprite)
+
     nodeSprites.push(sprite)
-    planetGroup.add(sprite)
+    nodeWrappers.push(wrapper)
+    planetGroup.add(wrapper)
   })
 }
 
@@ -386,8 +404,11 @@ const createCoreSprite = () => {
 
   coreSprite = new THREE.Sprite(material)
   coreSprite.scale.set(0.15, 0.15, 1)
-  coreSprite.position.set(0, 0, 0)
-  planetGroup.add(coreSprite)
+
+  coreWrapper = new THREE.Group()
+  coreWrapper.position.set(0, 0, 0)
+  coreWrapper.add(coreSprite)
+  planetGroup.add(coreWrapper)
 }
 
 const activateCore = () => {
@@ -673,9 +694,62 @@ const animateAwakening = () => {
   }, 0)
 }
 
+const getPinchDistance = (): number => {
+  if (activePointers.size < 2) return 0
+  const pts = Array.from(activePointers.values())
+  return Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y)
+}
+
+const updatePinchState = () => {
+  if (activePointers.size >= 2) {
+    if (!isPinching) {
+      isPinching = true
+      isDragging = false
+      lastPinchDistance = getPinchDistance()
+    }
+    return
+  }
+  isPinching = false
+  lastPinchDistance = 0
+}
+
+const applyCameraZoomFactor = (factor: number) => {
+  if (!camera || factor <= 0 || Math.abs(factor - 1) <= 0.002) return
+  camera.position.z /= factor
+  camera.position.z = THREE.MathUtils.clamp(camera.position.z, MIN_CAMERA_Z, MAX_CAMERA_Z)
+}
+
+const applyPinchZoom = (distance: number) => {
+  if (lastPinchDistance <= 0) return
+
+  const scale = distance / lastPinchDistance
+  if (Math.abs(scale - 1) > 0.002) {
+    suppressNextClick = true
+    applyCameraZoomFactor(scale)
+  }
+  lastPinchDistance = distance
+}
+
+const getWheelZoomFactor = (deltaY: number): number => {
+  const zoomIntensity = 0.0011 * (camera.position.z / INITIAL_CAMERA_Z)
+  return Math.exp(-deltaY * zoomIntensity)
+}
+
+const handleWheel = (event: WheelEvent) => {
+  if (props.phase !== 'exploring') return
+  event.preventDefault()
+  applyCameraZoomFactor(getWheelZoomFactor(event.deltaY))
+}
+
 const handlePointerDown = (event: PointerEvent) => {
   if (props.phase !== 'exploring') return
-  
+
+  containerRef.value?.setPointerCapture(event.pointerId)
+  activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+  updatePinchState()
+
+  if (isPinching) return
+
   isDragging = true
   previousMousePosition = { x: event.clientX, y: event.clientY }
   rotationVelocity = { x: 0, y: 0 }
@@ -683,6 +757,16 @@ const handlePointerDown = (event: PointerEvent) => {
 
 const handlePointerMove = (event: PointerEvent) => {
   if (!containerRef.value) return
+
+  if (activePointers.has(event.pointerId)) {
+    activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+  }
+
+  if (isPinching && props.phase === 'exploring' && activePointers.size >= 2) {
+    event.preventDefault()
+    applyPinchZoom(getPinchDistance())
+    return
+  }
 
   const rect = containerRef.value.getBoundingClientRect()
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
@@ -733,12 +817,32 @@ const handlePointerMove = (event: PointerEvent) => {
   }
 }
 
-const handlePointerUp = () => {
-  isDragging = false
+const handlePointerUp = (event: PointerEvent) => {
+  if (containerRef.value?.hasPointerCapture(event.pointerId)) {
+    containerRef.value.releasePointerCapture(event.pointerId)
+  }
+
+  activePointers.delete(event.pointerId)
+  updatePinchState()
+
+  if (activePointers.size === 0) {
+    isDragging = false
+  } else if (!isPinching && activePointers.size === 1) {
+    const remaining = activePointers.values().next().value
+    if (remaining) {
+      isDragging = true
+      previousMousePosition = { x: remaining.x, y: remaining.y }
+      rotationVelocity = { x: 0, y: 0 }
+    }
+  }
 }
 
 const handleClick = (event: MouseEvent) => {
   if (props.phase !== 'exploring' || !containerRef.value) return
+  if (suppressNextClick) {
+    suppressNextClick = false
+    return
+  }
 
   const rect = containerRef.value.getBoundingClientRect()
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
@@ -888,6 +992,34 @@ const updateAndDrawMeteors = (now: number) => {
   }
 }
 
+/** 记忆点世界缩放：拉近时抵消透视放大，拉远时额外缩小便于概览 */
+const getMarkerWorldScale = (): number => {
+  const z = camera.position.z
+  const ratio = z / INITIAL_CAMERA_Z
+
+  if (ratio <= 1) {
+    return Math.pow(ratio, MARKER_COMPENSATION_NEAR)
+  }
+
+  const t = THREE.MathUtils.smoothstep(INITIAL_CAMERA_Z, MAX_CAMERA_Z, z)
+  const nearScale = 1
+  const farScale = Math.pow(ratio, MARKER_COMPENSATION_FAR)
+  return THREE.MathUtils.lerp(nearScale, farScale, t)
+}
+
+const updateZoomScales = () => {
+  if (!camera || props.phase !== 'exploring') return
+
+  const markerScale = getMarkerWorldScale()
+
+  nodeWrappers.forEach((wrapper) => {
+    wrapper.scale.set(markerScale, markerScale, 1)
+  })
+  if (coreWrapper) {
+    coreWrapper.scale.set(markerScale, markerScale, 1)
+  }
+}
+
 const animate = () => {
   animationId = requestAnimationFrame(animate)
 
@@ -908,6 +1040,7 @@ const animate = () => {
     }
   }
 
+  updateZoomScales()
   updateAndDrawMeteors(performance.now())
 
   renderer.render(scene, camera)
@@ -980,6 +1113,8 @@ onUnmounted(() => {
   if (coreSprite) {
     coreSprite.material.dispose()
   }
+  nodeWrappers = []
+  coreWrapper = null
   corePulseTween?.kill()
 
   meteors = []
@@ -994,7 +1129,9 @@ onUnmounted(() => {
     @pointerdown="handlePointerDown"
     @pointermove="handlePointerMove"
     @pointerup="handlePointerUp"
+    @pointercancel="handlePointerUp"
     @pointerleave="handlePointerUp"
+    @wheel.prevent="handleWheel"
     @click="handleClick"
   >
     <canvas ref="meteorCanvasRef" class="meteor-canvas" />
@@ -1007,6 +1144,7 @@ onUnmounted(() => {
   inset: 0;
   width: 100%;
   height: 100%;
+  touch-action: none;
 }
 
 .meteor-canvas {
