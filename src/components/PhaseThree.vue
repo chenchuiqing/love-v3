@@ -70,6 +70,10 @@ let act4BreathingTime = 0
 let shapeHintTimer: ReturnType<typeof setTimeout> | null = null
 let hapticTextTimer: ReturnType<typeof setTimeout> | null = null
 let fireworksInstance: Fireworks | null = null
+let fireworksLaunchEndTimer: ReturnType<typeof setTimeout> | null = null
+
+/** 默认自动播放时，持续发射烟花的时长（毫秒） */
+const DEFAULT_FIREWORKS_LAUNCH_MS = 3000
 
 const FIREWORKS_OPTIONS = {
   rocketsPoint: { min: 10, max: 90 },
@@ -96,13 +100,48 @@ const ensureFireworks = (): Fireworks | null => {
   return fireworksInstance
 }
 
+const clearFireworksLaunchEndTimer = () => {
+  if (fireworksLaunchEndTimer) {
+    clearTimeout(fireworksLaunchEndTimer)
+    fireworksLaunchEndTimer = null
+  }
+}
+
+const stopFireworksImmediately = (dispose = false) => {
+  clearFireworksLaunchEndTimer()
+  if (fireworksInstance) {
+    fireworksInstance.stop(dispose)
+  }
+  fireworksOn.value = false
+}
+
+/** 发射窗口结束后：停止新烟花，等待已升空烟花炸完 */
+const finishFireworksLaunchWindow = async () => {
+  const instance = fireworksInstance
+  if (!instance?.isRunning) return
+
+  try {
+    await instance.waitStop()
+  } finally {
+    fireworksOn.value = false
+  }
+}
+
+const scheduleFireworksLaunchWindow = (durationMs = DEFAULT_FIREWORKS_LAUNCH_MS) => {
+  clearFireworksLaunchEndTimer()
+  fireworksLaunchEndTimer = setTimeout(() => {
+    fireworksLaunchEndTimer = null
+    void finishFireworksLaunchWindow()
+  }, durationMs)
+}
+
 const toggleFireworks = () => {
   const instance = ensureFireworks()
   if (!instance) return
   if (instance.isRunning) {
-    instance.stop()
-    fireworksOn.value = false
+    stopFireworksImmediately()
   } else {
+    clearFireworksLaunchEndTimer()
     instance.start()
     fireworksOn.value = true
   }
@@ -1005,11 +1044,12 @@ const startAct4 = async () => {
     ease: 'power2.out'
   })
 
-  // 背景烟花助兴：默认点燃一次，并展示控制按钮供手动启停
+  // 背景烟花助兴：默认发射 3 秒，已升空的烟花炸完后再停
   const instance = ensureFireworks()
   if (instance && !instance.isRunning) {
     instance.start()
     fireworksOn.value = true
+    scheduleFireworksLaunchWindow()
   }
   showFireworksBtn.value = true
 
@@ -1023,10 +1063,7 @@ const startAct4 = async () => {
 
 const handleBackToPlanet = () => {
   if (currentAct.value !== 4) return
-  if (fireworksInstance) {
-    fireworksInstance.stop(true)
-    fireworksOn.value = false
-  }
+  stopFireworksImmediately(true)
   emit('backToPlanet')
 }
 
@@ -1496,10 +1533,8 @@ onUnmounted(() => {
   cancelAnimationFrame(animationId)
   window.removeEventListener('resize', handleResize)
   if (shapeHintTimer) clearTimeout(shapeHintTimer)
-  if (fireworksInstance) {
-    fireworksInstance.stop(true)
-    fireworksInstance = null
-  }
+  stopFireworksImmediately(true)
+  fireworksInstance = null
 
   if (renderer) {
     renderer.dispose()
