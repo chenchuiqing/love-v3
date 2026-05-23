@@ -1101,7 +1101,7 @@ const handleSavePoster = async () => {
         ${CONFESSION_LINES.map(line => `<p style="margin: 0 0 0.5em 0;">${line}</p>`).join('')}
       </div>
       <div style="margin-top: 1.8rem; text-align: right; font-size: 0.95rem; letter-spacing: 0.08em; color: rgba(140, 90, 50, 0.7); font-family: sans-serif; font-weight: bold;">
-        <p style="margin: 0.2em 0;">永远偏向你的，</p>
+        <p style="margin: 0.2em 0;">永远偏向你的</p>
         <p style="margin: 0.2em 0;">陈垂青</p>
         <p style="margin: 0.2em 0;">2026年5月17日</p>
       </div>

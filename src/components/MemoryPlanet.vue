@@ -52,6 +52,9 @@ const ORBIT_PARTICLE_COUNT = 5000
 const STARFIELD_PARTICLE_COUNT = 3000
 const PLANET_RADIUS = 1.5
 const INITIAL_CAMERA_Z = 5
+const CORE_ACTIVATE_THRESHOLD = 3
+const VISITED_NODE_SCALE = 0.19
+const VISITED_NODE_HOVER_SCALE = 0.24
 
 const createGlowTexture = (color: string): THREE.CanvasTexture => {
   const canvas = document.createElement('canvas')
@@ -68,6 +71,33 @@ const createGlowTexture = (color: string): THREE.CanvasTexture => {
   ctx.fillStyle = gradient
   ctx.fillRect(0, 0, 64, 64)
   
+  return new THREE.CanvasTexture(canvas)
+}
+
+const createVisitedTexture = (color: string): THREE.CanvasTexture => {
+  const canvas = document.createElement('canvas')
+  canvas.width = 64
+  canvas.height = 64
+  const ctx = canvas.getContext('2d')!
+
+  const ringGradient = ctx.createRadialGradient(32, 32, 16, 32, 32, 26)
+  ringGradient.addColorStop(0, 'transparent')
+  ringGradient.addColorStop(0.4, color + '66')
+  ringGradient.addColorStop(0.72, color + 'dd')
+  ringGradient.addColorStop(0.88, color)
+  ringGradient.addColorStop(1, 'transparent')
+
+  ctx.fillStyle = ringGradient
+  ctx.fillRect(0, 0, 64, 64)
+
+  const centerDot = ctx.createRadialGradient(32, 32, 0, 32, 32, 5)
+  centerDot.addColorStop(0, 'rgba(255, 255, 255, 0.95)')
+  centerDot.addColorStop(0.6, color + 'aa')
+  centerDot.addColorStop(1, 'transparent')
+
+  ctx.fillStyle = centerDot
+  ctx.fillRect(0, 0, 64, 64)
+
   return new THREE.CanvasTexture(canvas)
 }
 
@@ -295,11 +325,31 @@ const createMemoryNodes = () => {
     const sprite = new THREE.Sprite(material)
     sprite.position.copy(position)
     sprite.scale.set(0.25, 0.25, 1)
-    sprite.userData = { memory }
+    sprite.userData = { memory, visited: false }
 
     nodeSprites.push(sprite)
     planetGroup.add(sprite)
   })
+}
+
+const markNodeVisited = (memoryId: string) => {
+  const sprite = nodeSprites.find((s) => s.userData.memory.id === memoryId)
+  if (!sprite || sprite.userData.visited) return
+
+  const memory = sprite.userData.memory as Memory
+  const visitedTexture = createVisitedTexture(memory.color)
+  const material = sprite.material as THREE.SpriteMaterial
+  material.map?.dispose()
+  material.map = visitedTexture
+  material.needsUpdate = true
+  sprite.userData.visited = true
+  gsap.to(material, { opacity: 1, duration: 0.3 })
+
+  gsap.fromTo(
+    sprite.scale,
+    { x: 0.35, y: 0.35 },
+    { x: VISITED_NODE_SCALE, y: VISITED_NODE_SCALE, duration: 0.5, ease: 'back.out(2)' }
+  )
 }
 
 const createCoreSprite = () => {
@@ -607,18 +657,20 @@ const handlePointerMove = (event: PointerEvent) => {
       const isCore = coreSprite !== null && sprite === coreSprite
       if (hoveredSprite !== sprite) {
         if (hoveredSprite) {
-          gsap.to(hoveredSprite.scale, { x: 0.25, y: 0.25, duration: 0.3 })
+          const prevBase = hoveredSprite.userData.visited ? VISITED_NODE_SCALE : 0.25
+          gsap.to(hoveredSprite.scale, { x: prevBase, y: prevBase, duration: 0.3 })
           gsap.to(hoveredSprite.material, { opacity: 0.9, duration: 0.3 })
         }
         hoveredSprite = sprite
-        const targetScale = isCore ? 0.28 : 0.35
+        const targetScale = isCore ? 0.28 : sprite.userData.visited ? VISITED_NODE_HOVER_SCALE : 0.35
         gsap.to(sprite.scale, { x: targetScale, y: targetScale, duration: 0.3 })
         gsap.to(sprite.material, { opacity: 1, duration: 0.3 })
         document.body.style.cursor = 'pointer'
       }
     } else {
       if (hoveredSprite) {
-        gsap.to(hoveredSprite.scale, { x: 0.25, y: 0.25, duration: 0.3 })
+        const prevBase = hoveredSprite.userData.visited ? VISITED_NODE_SCALE : 0.25
+        gsap.to(hoveredSprite.scale, { x: prevBase, y: prevBase, duration: 0.3 })
         gsap.to(hoveredSprite.material, { opacity: 0.9, duration: 0.3 })
         hoveredSprite = null
         document.body.style.cursor = 'default'
@@ -654,7 +706,8 @@ const handleClick = (event: MouseEvent) => {
 
     const memory = sprite.userData.memory as Memory
     visitedIds.add(memory.id)
-    if (visitedIds.size >= props.memories.length) {
+    markNodeVisited(memory.id)
+    if (visitedIds.size >= CORE_ACTIVATE_THRESHOLD) {
       activateCore()
     }
     emit('nodeClick', memory)

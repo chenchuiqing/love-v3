@@ -13,9 +13,11 @@ const emit = defineEmits<{
   (e: 'complete'): void
 }>()
 
+const CORE_ACTIVATE_THRESHOLD = 3
+
 const showDetail = computed(() => phase.value === 'viewing' && activeMemory.value !== null)
 const showCoreHint = computed(
-  () => phase.value === 'exploring' && visitedIds.value.size >= memories.length
+  () => phase.value === 'exploring' && visitedIds.value.size >= CORE_ACTIVATE_THRESHOLD
 )
 
 const handleFormingComplete = () => {
@@ -72,7 +74,7 @@ const handleAwakeningComplete = () => {
       leave-to-class="opacity-0"
     >
       <p v-if="showCoreHint" class="core-hint">
-        你已点亮所有回忆，现在，触碰星球的心脏
+        你已点亮 3 段记忆，现在，触碰星球的心脏
       </p>
     </Transition>
 
