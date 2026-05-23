@@ -346,6 +346,21 @@ onUnmounted(() => {
   text-align: center;
 }
 
+@media (max-width: 640px) {
+  .content-wrapper {
+    width: 100%;
+    padding: 1.25rem 1rem 1.5rem;
+    gap: 1rem;
+    max-height: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .memory-title {
+    font-size: 1.5rem;
+  }
+}
+
 .date-badge {
   display: inline-block;
   padding: 0.5rem 1rem;
@@ -366,40 +381,47 @@ onUnmounted(() => {
 }
 
 .image-container {
-  width: 100%;
   max-width: 400px;
-  display: flex;
-  justify-content: center;
+  margin: 0 auto;
+}
+
+/* 竖图：固定 4:3 画框，裁掉上下多余部分（absolute 避免 iOS 上 height:100% 失效留白） */
+.image-container.is-portrait {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
   border-radius: 1rem;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* 竖图：固定 4:3 画框，裁掉上下多余部分 */
-.image-container.is-portrait {
-  display: block;
-  aspect-ratio: 4 / 3;
-  overflow: hidden;
+  line-height: 0;
 }
 
 .image-container.is-portrait img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
-  max-width: none;
-  max-height: none;
   object-fit: cover;
-  border-radius: 0;
+  object-position: center;
 }
 
-/* 横图 / 方图：完整显示，不裁切 */
+/* 横图 / 方图：容器高度贴合图片，避免移动端容器比图高产生留白 */
+.image-container:not(.is-portrait) {
+  display: block;
+  width: 100%;
+  line-height: 0;
+}
+
 .image-container:not(.is-portrait) img {
   display: block;
-  max-width: 100%;
-  max-height: min(45vh, 360px);
-  width: auto;
+  width: 100%;
   height: auto;
+  max-height: min(42vh, 320px);
   object-fit: contain;
   border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .image-container img {
