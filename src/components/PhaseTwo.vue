@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import type { Memory, PlanetPhase } from '@/types/memory'
 import { memories } from '@/data/memories'
 import MemoryPlanet from './MemoryPlanet.vue'
@@ -24,11 +24,30 @@ const syncVisitedToParent = () => {
 }
 
 const CORE_ACTIVATE_THRESHOLD = 3
+const CORE_HINT_DURATION_MS = 4500
 
 const showDetail = computed(() => phase.value === 'viewing' && activeMemory.value !== null)
-const showCoreHint = computed(
-  () => phase.value === 'exploring' && visitedIds.value.size >= CORE_ACTIVATE_THRESHOLD
+const coreHintVisible = ref(false)
+const coreHintShownForSession = ref(
+  (props.initialVisitedIds?.length ?? 0) >= CORE_ACTIVATE_THRESHOLD
 )
+let coreHintTimer: ReturnType<typeof setTimeout> | null = null
+
+const clearCoreHintTimer = () => {
+  if (coreHintTimer !== null) {
+    clearTimeout(coreHintTimer)
+    coreHintTimer = null
+  }
+}
+
+const showCoreHintBriefly = () => {
+  clearCoreHintTimer()
+  coreHintVisible.value = true
+  coreHintTimer = setTimeout(() => {
+    coreHintVisible.value = false
+    coreHintTimer = null
+  }, CORE_HINT_DURATION_MS)
+}
 
 const handleFormingComplete = () => {
   phase.value = 'exploring'
@@ -52,6 +71,13 @@ const handleDetailClose = () => {
 const handleReturnComplete = () => {
   activeMemory.value = null
   phase.value = 'exploring'
+  if (
+    visitedIds.value.size >= CORE_ACTIVATE_THRESHOLD &&
+    !coreHintShownForSession.value
+  ) {
+    coreHintShownForSession.value = true
+    showCoreHintBriefly()
+  }
 }
 
 const handleCoreActivate = () => {
@@ -68,6 +94,10 @@ onMounted(() => {
   if (props.resumeExploring && visitedIds.value.size > 0) {
     syncVisitedToParent()
   }
+})
+
+onUnmounted(() => {
+  clearCoreHintTimer()
 })
 </script>
 
@@ -93,7 +123,7 @@ onMounted(() => {
       enter-from-class="opacity-0"
       leave-to-class="opacity-0"
     >
-      <p v-if="showCoreHint" class="core-hint">
+      <p v-if="coreHintVisible" class="core-hint">
         你已点亮 3 段记忆，现在，触碰星球的心脏
       </p>
     </Transition>
