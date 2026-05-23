@@ -370,6 +370,9 @@ onBeforeUnmount(() => {
     @pointerup="handlePointerUp"
     @pointerleave="handlePointerUp"
     @contextmenu.prevent
+    @selectstart.prevent
+    @copy.prevent
+    @cut.prevent
   >
     <div ref="containerRef" class="canvas-layer"></div>
     
@@ -394,7 +397,16 @@ onBeforeUnmount(() => {
   overflow: hidden;
   background: radial-gradient(circle at 50% 45%, #072448 0%, #000010 70%);
   cursor: pointer;
+  touch-action: none;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.phase-one * {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .canvas-layer {
