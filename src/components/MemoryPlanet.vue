@@ -20,6 +20,18 @@ const emit = defineEmits<{
 }>()
 
 const containerRef = ref<HTMLElement | null>(null)
+const meteorCanvasRef = ref<HTMLCanvasElement | null>(null)
+
+interface MeteorData {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  tailLength: number
+  opacity: number
+  age: number
+  maxAge: number
+}
 
 let scene: THREE.Scene
 let camera: THREE.PerspectiveCamera
@@ -34,6 +46,14 @@ let coreSprite: THREE.Sprite | null = null
 let raycaster: THREE.Raycaster
 let mouse: THREE.Vector2
 let corePulseTween: gsap.core.Tween | null = null
+
+let meteorCtx: CanvasRenderingContext2D | null = null
+let meteors: MeteorData[] = []
+let nextMeteorTime = 0
+let isShowerActive = false
+let showerEndTime = 0
+let nextShowerSpawnTime = 0
+let lastFrameTime = 0
 
 let planetGeometry: THREE.BufferGeometry
 let orbitGeometry: THREE.BufferGeometry
@@ -714,6 +734,126 @@ const handleClick = (event: MouseEvent) => {
   }
 }
 
+const initMeteorCanvas = () => {
+  if (!meteorCanvasRef.value || !containerRef.value) return
+
+  const canvas = meteorCanvasRef.value
+  const dpr = Math.min(window.devicePixelRatio || 1, 2)
+  canvas.width = containerRef.value.clientWidth * dpr
+  canvas.height = containerRef.value.clientHeight * dpr
+  meteorCtx = canvas.getContext('2d')
+  if (meteorCtx) {
+    meteorCtx.scale(dpr, dpr)
+  }
+
+  nextMeteorTime = performance.now() + 3000 + Math.random() * 5000
+  lastFrameTime = performance.now()
+}
+
+const spawnMeteor = (fast = false) => {
+  if (!containerRef.value) return
+
+  const width = containerRef.value.clientWidth
+
+  const startX = Math.random() * width * 1.2 - width * 0.1
+  const startY = -50
+
+  const angleDeg = 25 + Math.random() * 25
+  const angleRad = (angleDeg * Math.PI) / 180
+
+  const baseSpeed = fast ? 1.4 + Math.random() * 0.4 : 0.8 + Math.random() * 0.5
+  const vx = Math.cos(angleRad) * baseSpeed
+  const vy = Math.sin(angleRad) * baseSpeed
+
+  const tailLength = 80 + Math.random() * 120
+  const maxAge = fast
+    ? 1000 + Math.random() * 600
+    : 1400 + Math.random() * 900
+
+  meteors.push({
+    x: startX,
+    y: startY,
+    vx,
+    vy,
+    tailLength,
+    opacity: 0.7 + Math.random() * 0.3,
+    age: 0,
+    maxAge,
+  })
+}
+
+const updateAndDrawMeteors = (now: number) => {
+  if (!meteorCtx || !meteorCanvasRef.value || !containerRef.value) return
+
+  const dt = Math.min(now - lastFrameTime, 64)
+  lastFrameTime = now
+
+  const width = containerRef.value.clientWidth
+  const height = containerRef.value.clientHeight
+
+  meteorCtx.clearRect(0, 0, width, height)
+
+  for (let i = meteors.length - 1; i >= 0; i--) {
+    const m = meteors[i]
+    m.x += m.vx * dt
+    m.y += m.vy * dt
+    m.age += dt
+
+    const fadeStart = m.maxAge * 0.75
+    let alpha = m.opacity
+    if (m.age > fadeStart) {
+      alpha = m.opacity * Math.max(0, 1 - (m.age - fadeStart) / (m.maxAge - fadeStart))
+    }
+
+    const dirLen = Math.hypot(m.vx, m.vy) || 1
+    const tailX = m.x - (m.vx / dirLen) * m.tailLength
+    const tailY = m.y - (m.vy / dirLen) * m.tailLength
+
+    const gradient = meteorCtx.createLinearGradient(tailX, tailY, m.x, m.y)
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0)')
+    gradient.addColorStop(0.7, `rgba(200, 220, 255, ${alpha * 0.5})`)
+    gradient.addColorStop(1, `rgba(255, 255, 255, ${alpha})`)
+
+    meteorCtx.strokeStyle = gradient
+    meteorCtx.lineWidth = 1.6
+    meteorCtx.lineCap = 'round'
+    meteorCtx.beginPath()
+    meteorCtx.moveTo(tailX, tailY)
+    meteorCtx.lineTo(m.x, m.y)
+    meteorCtx.stroke()
+
+    meteorCtx.beginPath()
+    meteorCtx.fillStyle = `rgba(255, 255, 255, ${alpha})`
+    meteorCtx.arc(m.x, m.y, 1.6, 0, Math.PI * 2)
+    meteorCtx.fill()
+
+    const offscreen = m.x > width + 100 || m.y > height + 100 || m.x < -200
+    if (m.age >= m.maxAge || offscreen) {
+      meteors.splice(i, 1)
+    }
+  }
+
+  if (isShowerActive) {
+    if (now >= showerEndTime) {
+      isShowerActive = false
+    } else if (now >= nextShowerSpawnTime) {
+      spawnMeteor(true)
+      nextShowerSpawnTime = now + 80 + Math.random() * 170
+    }
+  }
+
+  if (now >= nextMeteorTime) {
+    if (!isShowerActive && Math.random() < 0.03) {
+      isShowerActive = true
+      showerEndTime = now + 3000 + Math.random() * 4000
+      nextShowerSpawnTime = now
+    } else {
+      spawnMeteor(false)
+    }
+    nextMeteorTime = now + 8000 + Math.random() * 12000
+  }
+}
+
 const animate = () => {
   animationId = requestAnimationFrame(animate)
 
@@ -734,6 +874,8 @@ const animate = () => {
     }
   }
 
+  updateAndDrawMeteors(performance.now())
+
   renderer.render(scene, camera)
 }
 
@@ -743,6 +885,16 @@ const handleResize = () => {
   camera.aspect = containerRef.value.clientWidth / containerRef.value.clientHeight
   camera.updateProjectionMatrix()
   renderer.setSize(containerRef.value.clientWidth, containerRef.value.clientHeight)
+
+  if (meteorCanvasRef.value) {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    meteorCanvasRef.value.width = containerRef.value.clientWidth * dpr
+    meteorCanvasRef.value.height = containerRef.value.clientHeight * dpr
+    if (meteorCtx) {
+      meteorCtx.setTransform(1, 0, 0, 1, 0, 0)
+      meteorCtx.scale(dpr, dpr)
+    }
+  }
 }
 
 watch(() => props.phase, (newPhase) => {
@@ -764,6 +916,7 @@ watch(() => props.phase, (newPhase) => {
 
 onMounted(() => {
   initScene()
+  initMeteorCanvas()
   window.addEventListener('resize', handleResize)
 
   if (props.phase === 'forming') {
@@ -792,6 +945,9 @@ onUnmounted(() => {
     coreSprite.material.dispose()
   }
   corePulseTween?.kill()
+
+  meteors = []
+  meteorCtx = null
 })
 </script>
 
@@ -804,7 +960,9 @@ onUnmounted(() => {
     @pointerup="handlePointerUp"
     @pointerleave="handlePointerUp"
     @click="handleClick"
-  />
+  >
+    <canvas ref="meteorCanvasRef" class="meteor-canvas" />
+  </div>
 </template>
 
 <style scoped>
@@ -813,5 +971,14 @@ onUnmounted(() => {
   inset: 0;
   width: 100%;
   height: 100%;
+}
+
+.meteor-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
 }
 </style>
