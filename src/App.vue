@@ -6,6 +6,8 @@ import PhaseThree from './components/PhaseThree.vue';
 import FloatingMusicPlayer from './components/FloatingMusicPlayer.vue';
 
 const currentPhase = ref(1);
+const phaseTwoResume = ref(false);
+const visitedMemoryIds = ref(new Set<string>());
 const isTransitioning = ref(false);
 const isFullscreen = ref(false);
 const appRef = ref<HTMLElement | null>(null);
@@ -21,6 +23,7 @@ const handlePhaseOneComplete = () => {
 };
 
 const handlePhaseTwoComplete = () => {
+  phaseTwoResume.value = false;
   isTransitioning.value = true;
   setTimeout(() => {
     currentPhase.value = 3;
@@ -28,6 +31,21 @@ const handlePhaseTwoComplete = () => {
       isTransitioning.value = false;
     }, 1200);
   }, 800);
+};
+
+const handleBackToPlanet = () => {
+  isTransitioning.value = true;
+  setTimeout(() => {
+    phaseTwoResume.value = true;
+    currentPhase.value = 2;
+    setTimeout(() => {
+      isTransitioning.value = false;
+    }, 1200);
+  }, 800);
+};
+
+const handleVisitedUpdate = (ids: string[]) => {
+  visitedMemoryIds.value = new Set(ids);
 };
 
 const handleAct1Complete = () => {
@@ -82,12 +100,22 @@ onUnmounted(() => {
     
     <!-- 第二阶段：记忆星球 -->
     <Transition name="phase-fade">
-      <PhaseTwo v-if="currentPhase === 2" @complete="handlePhaseTwoComplete" />
+      <PhaseTwo
+        v-if="currentPhase === 2"
+        :resume-exploring="phaseTwoResume"
+        :initial-visited-ids="phaseTwoResume ? Array.from(visitedMemoryIds) : undefined"
+        @visited-update="handleVisitedUpdate"
+        @complete="handlePhaseTwoComplete"
+      />
     </Transition>
 
     <!-- 第三阶段：手绘爱心 -->
     <Transition name="phase-fade">
-      <PhaseThree v-if="currentPhase === 3" @act1-complete="handleAct1Complete" />
+      <PhaseThree
+        v-if="currentPhase === 3"
+        @act1-complete="handleAct1Complete"
+        @back-to-planet="handleBackToPlanet"
+      />
     </Transition>
 
     <!-- 全局浮动音乐播放器 -->

@@ -1,17 +1,27 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import type { Memory, PlanetPhase } from '@/types/memory'
 import { memories } from '@/data/memories'
 import MemoryPlanet from './MemoryPlanet.vue'
 import MemoryDetail from './MemoryDetail.vue'
 
-const phase = ref<PlanetPhase>('forming')
+const props = defineProps<{
+  resumeExploring?: boolean
+  initialVisitedIds?: string[]
+}>()
+
+const phase = ref<PlanetPhase>(props.resumeExploring ? 'exploring' : 'forming')
 const activeMemory = ref<Memory | null>(null)
-const visitedIds = ref(new Set<string>())
+const visitedIds = ref(new Set<string>(props.initialVisitedIds ?? []))
 
 const emit = defineEmits<{
   (e: 'complete'): void
+  (e: 'visitedUpdate', ids: string[]): void
 }>()
+
+const syncVisitedToParent = () => {
+  emit('visitedUpdate', Array.from(visitedIds.value))
+}
 
 const CORE_ACTIVATE_THRESHOLD = 3
 
@@ -26,6 +36,7 @@ const handleFormingComplete = () => {
 
 const handleNodeClick = (memory: Memory) => {
   visitedIds.value.add(memory.id)
+  syncVisitedToParent()
   activeMemory.value = memory
   phase.value = 'zooming'
 }
@@ -49,8 +60,15 @@ const handleCoreActivate = () => {
 }
 
 const handleAwakeningComplete = () => {
+  syncVisitedToParent()
   emit('complete')
 }
+
+onMounted(() => {
+  if (props.resumeExploring && visitedIds.value.size > 0) {
+    syncVisitedToParent()
+  }
+})
 </script>
 
 <template>
@@ -59,6 +77,8 @@ const handleAwakeningComplete = () => {
       :phase="phase"
       :memories="memories"
       :active-memory="activeMemory"
+      :skip-forming="resumeExploring"
+      :initial-visited-ids="resumeExploring ? Array.from(visitedIds) : undefined"
       @forming-complete="handleFormingComplete"
       @node-click="handleNodeClick"
       @core-activate="handleCoreActivate"

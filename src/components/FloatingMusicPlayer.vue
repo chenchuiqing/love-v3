@@ -1,8 +1,16 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useMusicPlayerStore } from '@/stores/musicPlayer'
 
 const musicPlayer = useMusicPlayerStore()
+const isCollapsed = ref(false)
+
+watch(
+  () => musicPlayer.isVisible,
+  (visible) => {
+    if (!visible) isCollapsed.value = false
+  }
+)
 
 const formatTime = (sec: number) => {
   if (!Number.isFinite(sec) || sec < 0) return '0:00'
@@ -24,6 +32,18 @@ const handleToggle = () => {
   musicPlayer.toggle()
 }
 
+const handleVinylClick = () => {
+  if (isCollapsed.value) {
+    isCollapsed.value = false
+    return
+  }
+  handleToggle()
+}
+
+const handleCollapse = () => {
+  isCollapsed.value = true
+}
+
 const handleClose = () => {
   musicPlayer.close()
 }
@@ -33,7 +53,13 @@ const waveBars = [0, 1, 2, 3, 4]
 
 <template>
   <Transition name="player-rise">
-    <div v-if="musicPlayer.isVisible" class="floating-player" role="region" aria-label="正在播放">
+    <div
+      v-if="musicPlayer.isVisible"
+      class="floating-player"
+      :class="{ 'is-collapsed': isCollapsed }"
+      role="region"
+      :aria-label="isCollapsed ? '音乐播放器（已收起，点击展开）' : '正在播放'"
+    >
       <!-- 光环涟漪 -->
       <div class="aura" :class="{ 'is-playing': musicPlayer.isPlaying }">
         <span class="aura-ring aura-ring-1" />
@@ -41,9 +67,13 @@ const waveBars = [0, 1, 2, 3, 4]
         <span class="aura-ring aura-ring-3" />
       </div>
 
-      <div class="player-card">
+      <div class="player-card" :class="{ 'is-collapsed': isCollapsed }">
         <!-- 黑胶唱片 -->
-        <div class="vinyl-wrapper" @click="handleToggle">
+        <div
+          class="vinyl-wrapper"
+          :title="isCollapsed ? '点击展开播放器' : undefined"
+          @click="handleVinylClick"
+        >
           <div class="vinyl" :class="{ 'is-playing': musicPlayer.isPlaying }">
             <div class="vinyl-grooves" />
             <div
@@ -58,7 +88,7 @@ const waveBars = [0, 1, 2, 3, 4]
         </div>
 
         <!-- 信息与进度 -->
-        <div class="info">
+        <div v-show="!isCollapsed" class="info">
           <div class="title-row">
             <span class="now-label">NOW PLAYING</span>
             <span class="title" :title="musicPlayer.currentTitle">{{ musicPlayer.currentTitle }}</span>
@@ -87,7 +117,12 @@ const waveBars = [0, 1, 2, 3, 4]
         </div>
 
         <!-- 音波 -->
-        <div class="wave" :class="{ 'is-playing': musicPlayer.isPlaying }" aria-hidden="true">
+        <div
+          v-show="!isCollapsed"
+          class="wave"
+          :class="{ 'is-playing': musicPlayer.isPlaying }"
+          aria-hidden="true"
+        >
           <span
             v-for="i in waveBars"
             :key="i"
@@ -97,7 +132,7 @@ const waveBars = [0, 1, 2, 3, 4]
         </div>
 
         <!-- 控制按钮 -->
-        <div class="controls">
+        <div v-show="!isCollapsed" class="controls">
           <button
             class="ctrl-button play-pause"
             :aria-label="musicPlayer.isPlaying ? '暂停' : '播放'"
@@ -109,6 +144,11 @@ const waveBars = [0, 1, 2, 3, 4]
             </svg>
             <svg v-else viewBox="0 0 24 24" class="icon">
               <path d="M8 5v14l11-7z" />
+            </svg>
+          </button>
+          <button class="ctrl-button collapse" aria-label="收起播放器" @click="handleCollapse">
+            <svg viewBox="0 0 24 24" class="icon">
+              <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </button>
           <button class="ctrl-button close" aria-label="关闭播放器" @click="handleClose">
@@ -130,6 +170,16 @@ const waveBars = [0, 1, 2, 3, 4]
   transform: translateX(-50%);
   z-index: 9000;
   pointer-events: none;
+  transition:
+    left 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+    right 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.floating-player.is-collapsed {
+  left: auto;
+  right: 1.25rem;
+  transform: none;
 }
 
 .player-card {
@@ -142,6 +192,12 @@ const waveBars = [0, 1, 2, 3, 4]
   min-width: 460px;
   max-width: 92vw;
   border-radius: 999px;
+  transition:
+    min-width 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+    width 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+    padding 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+    gap 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+    border-radius 0.45s cubic-bezier(0.4, 0, 0.2, 1);
   background: linear-gradient(
     135deg,
     rgba(20, 28, 56, 0.78) 0%,
@@ -180,6 +236,16 @@ const waveBars = [0, 1, 2, 3, 4]
   opacity: 0.85;
 }
 
+.player-card.is-collapsed {
+  min-width: 0;
+  width: 72px;
+  height: 72px;
+  padding: 6px;
+  gap: 0;
+  border-radius: 50%;
+  justify-content: center;
+}
+
 /* --- 光环涟漪 --- */
 .aura {
   position: absolute;
@@ -189,6 +255,11 @@ const waveBars = [0, 1, 2, 3, 4]
   height: 64px;
   transform: translate(-50%, -50%);
   pointer-events: none;
+  transition: left 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.floating-player.is-collapsed .aura {
+  left: 50%;
 }
 .aura-ring {
   position: absolute;
@@ -296,11 +367,11 @@ const waveBars = [0, 1, 2, 3, 4]
   width: 28px;
   height: 28px;
   transform-origin: top right;
-  transform: rotate(-25deg);
+  transform: rotate(15deg);
   transition: transform 0.6s cubic-bezier(0.65, 0, 0.35, 1);
 }
 .vinyl-arm.is-playing {
-  transform: rotate(15deg);
+  transform: rotate(-25deg);
 }
 .vinyl-arm::before {
   content: '';
@@ -535,12 +606,24 @@ const waveBars = [0, 1, 2, 3, 4]
 }
 
 @media (max-width: 540px) {
-  .player-card {
+  .floating-player.is-collapsed {
+    right: 0.75rem;
+    bottom: 1.25rem;
+  }
+
+  .player-card:not(.is-collapsed) {
     min-width: 0;
     width: 92vw;
     padding: 0.6rem 0.8rem 0.6rem 0.6rem;
     gap: 0.75rem;
   }
+
+  .player-card.is-collapsed {
+    width: 60px;
+    height: 60px;
+    padding: 5px;
+  }
+
   .now-label {
     display: none;
   }
@@ -551,10 +634,19 @@ const waveBars = [0, 1, 2, 3, 4]
     width: 48px;
     height: 48px;
   }
+  .player-card.is-collapsed .vinyl-wrapper {
+    width: 50px;
+    height: 50px;
+  }
   .aura {
     left: 24px;
     width: 48px;
     height: 48px;
+  }
+  .floating-player.is-collapsed .aura {
+    left: 50%;
+    width: 56px;
+    height: 56px;
   }
 }
 </style>

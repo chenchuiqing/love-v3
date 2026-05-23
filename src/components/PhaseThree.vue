@@ -9,6 +9,7 @@ import { Fireworks } from 'fireworks-js'
 
 const emit = defineEmits<{
   (e: 'act1Complete'): void
+  (e: 'backToPlanet'): void
 }>()
 
 const PHOTO_URL = '/photo.jpg'
@@ -1020,6 +1021,15 @@ const startAct4 = async () => {
   emit('act1Complete')
 }
 
+const handleBackToPlanet = () => {
+  if (currentAct.value !== 4) return
+  if (fireworksInstance) {
+    fireworksInstance.stop(true)
+    fireworksOn.value = false
+  }
+  emit('backToPlanet')
+}
+
 const triggerRoseHaptic = () => {
   if (currentAct.value !== 4) return
   if ('vibrate' in navigator) {
@@ -1563,7 +1573,7 @@ onUnmounted(() => {
             </p>
           </div>
           <div v-if="isTypingFinished" class="letter-footer">
-            <p>永远偏向你的，</p>
+            <p>永远偏向你的</p>
             <p>陈垂青</p>
             <p>2026年5月17日</p>
           </div>
@@ -1598,6 +1608,21 @@ onUnmounted(() => {
       leave-to-class="opacity-0"
     >
       <button v-if="showSaveBtn" class="save-btn" @click="handleSavePoster">留住这一刻</button>
+    </Transition>
+
+    <Transition
+      enter-active-class="transition-opacity duration-700"
+      leave-active-class="transition-opacity duration-300"
+      enter-from-class="opacity-0"
+      leave-to-class="opacity-0"
+    >
+      <button
+        v-if="showFireworksBtn"
+        class="back-planet-btn"
+        @click="handleBackToPlanet"
+      >
+        回到记忆星球
+      </button>
     </Transition>
 
     <Transition
@@ -1897,6 +1922,31 @@ onUnmounted(() => {
 .save-btn:hover {
   box-shadow: 0 0 18px rgba(255, 120, 170, 0.5);
   transform: translateY(-1px);
+}
+
+.back-planet-btn {
+  position: absolute;
+  left: 50%;
+  bottom: 1.2rem;
+  z-index: 20;
+  transform: translateX(-50%);
+  padding: 0.55rem 1.15rem;
+  border-radius: 999px;
+  border: 1px solid rgba(163, 218, 255, 0.5);
+  background: rgba(4, 20, 48, 0.55);
+  color: rgba(236, 247, 255, 0.96);
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: 240ms ease;
+  white-space: nowrap;
+}
+
+.back-planet-btn:hover {
+  border-color: rgba(188, 229, 255, 0.82);
+  box-shadow: 0 0 16px rgba(123, 193, 255, 0.35);
+  transform: translateX(-50%) translateY(-1px);
 }
 
 .fireworks-btn {

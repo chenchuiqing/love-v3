@@ -8,6 +8,8 @@ const props = defineProps<{
   phase: PlanetPhase
   memories: Memory[]
   activeMemory: Memory | null
+  skipForming?: boolean
+  initialVisitedIds?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -407,6 +409,38 @@ const activateCore = () => {
     yoyo: true,
     ease: 'sine.inOut'
   })
+}
+
+const applyFormedState = () => {
+  const planetPositions = planetGeometry.attributes.position.array as Float32Array
+  const orbitPositions = orbitGeometry.attributes.position.array as Float32Array
+
+  for (let i = 0; i < PLANET_PARTICLE_COUNT; i++) {
+    planetPositions[i * 3] = planetTargetPositions[i * 3]
+    planetPositions[i * 3 + 1] = planetTargetPositions[i * 3 + 1]
+    planetPositions[i * 3 + 2] = planetTargetPositions[i * 3 + 2]
+  }
+  planetGeometry.attributes.position.needsUpdate = true
+
+  for (let i = 0; i < ORBIT_PARTICLE_COUNT; i++) {
+    orbitPositions[i * 3] = orbitTargetPositions[i * 3]
+    orbitPositions[i * 3 + 1] = orbitTargetPositions[i * 3 + 1]
+    orbitPositions[i * 3 + 2] = orbitTargetPositions[i * 3 + 2]
+  }
+  orbitGeometry.attributes.position.needsUpdate = true
+
+  nodeSprites.forEach((sprite) => {
+    sprite.material.opacity = 0.9
+  })
+
+  props.initialVisitedIds?.forEach((memoryId) => {
+    visitedIds.add(memoryId)
+    markNodeVisited(memoryId)
+  })
+
+  if (visitedIds.size >= CORE_ACTIVATE_THRESHOLD) {
+    activateCore()
+  }
 }
 
 const animateForming = () => {
@@ -919,7 +953,9 @@ onMounted(() => {
   initMeteorCanvas()
   window.addEventListener('resize', handleResize)
 
-  if (props.phase === 'forming') {
+  if (props.skipForming) {
+    applyFormedState()
+  } else if (props.phase === 'forming') {
     animateForming()
   }
 })
