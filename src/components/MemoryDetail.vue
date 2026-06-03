@@ -404,6 +404,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
 .particle-canvas {
@@ -419,12 +420,26 @@ onUnmounted(() => {
   z-index: 10;
   max-width: 760px;
   width: 90%;
+  max-height: 100dvh;
+  box-sizing: border-box;
   padding: 2rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1.5rem;
   text-align: center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.content-wrapper::-webkit-scrollbar {
+  display: none;
+}
+
+.content-wrapper > * {
+  flex-shrink: 0;
 }
 
 @media (max-width: 640px) {
@@ -432,9 +447,6 @@ onUnmounted(() => {
     width: 100%;
     padding: 1.25rem 1rem 1.5rem;
     gap: 1rem;
-    max-height: 100%;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
   }
 
   .memory-title {
