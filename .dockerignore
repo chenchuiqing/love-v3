@@ -1,0 +1,9 @@
+node_modules
+dist
+.git
+.cursor
+data
+uploads/memories/*
+!uploads/memories/.gitkeep
+*.log
+.env
