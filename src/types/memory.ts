@@ -22,6 +22,7 @@ export interface MemoryContent {
   text?: string
   imageUrl?: string
   audioUrl?: string
+  videoUrl?: string
   location?: string
   theme?: ParticleTheme
 }

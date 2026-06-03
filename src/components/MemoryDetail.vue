@@ -272,8 +272,19 @@ onUnmounted(() => {
         {{ memory.title }}
       </h2>
 
+      <div v-if="memory.content.videoUrl" class="video-container">
+        <video
+          class="memory-video"
+          :src="memory.content.videoUrl"
+          :poster="memory.content.imageUrl"
+          controls
+          playsinline
+          preload="metadata"
+        />
+      </div>
+
       <div
-        v-if="memory.content.imageUrl"
+        v-else-if="memory.content.imageUrl"
         class="image-container"
         :class="{ 'is-portrait': isPortraitImage }"
       >
@@ -383,6 +394,22 @@ onUnmounted(() => {
 .image-container {
   max-width: 400px;
   margin: 0 auto;
+}
+
+.video-container {
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.memory-video {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: min(42vh, 320px);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* 竖图：固定 4:3 画框，裁掉上下多余部分（absolute 避免 iOS 上 height:100% 失效留白） */

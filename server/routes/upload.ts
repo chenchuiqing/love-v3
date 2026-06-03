@@ -8,8 +8,9 @@ import { requireAuth, type AppVariables } from '../auth'
 import { env } from '../config'
 
 const IMAGE_PREFIX = 'image/'
+const VIDEO_PREFIX = 'video/'
 const ALLOWED_AUDIO = new Set(['audio/mpeg', 'audio/mp3'])
-const MAX_UPLOAD_SIZE = 10 * 1024 * 1024
+const MAX_UPLOAD_SIZE = 100 * 1024 * 1024
 
 const safeFileName = (name: string): string => {
   return name.replace(/[^a-zA-Z0-9._-]/g, '-')
@@ -21,7 +22,7 @@ const buildStoredFileName = (originalName: string): string => {
 }
 
 const isAllowedMime = (mimeType: string): boolean => {
-  return mimeType.startsWith(IMAGE_PREFIX) || ALLOWED_AUDIO.has(mimeType)
+  return mimeType.startsWith(IMAGE_PREFIX) || mimeType.startsWith(VIDEO_PREFIX) || ALLOWED_AUDIO.has(mimeType)
 }
 
 export const uploadRoutes = new Hono<{ Variables: AppVariables }>()
@@ -39,7 +40,7 @@ uploadRoutes.post('/admin/upload', requireAuth, async (c) => {
   }
 
   if (!isAllowedMime(file.type)) {
-    return c.json({ message: '文件类型不支持，只允许图片和 mp3' }, 400)
+    return c.json({ message: '文件类型不支持，只允许图片、视频和 mp3' }, 400)
   }
 
   if (file.size > MAX_UPLOAD_SIZE) {

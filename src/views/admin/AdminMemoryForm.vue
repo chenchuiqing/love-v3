@@ -25,6 +25,7 @@ interface FormState {
   text: string
   imageUrl: string
   audioUrl: string
+  videoUrl: string
   location: string
   theme: ParticleTheme
 }
@@ -66,6 +67,7 @@ const form = reactive<FormState>({
   text: '',
   imageUrl: '',
   audioUrl: '',
+  videoUrl: '',
   location: '',
   theme: 'default',
 })
@@ -73,8 +75,10 @@ const form = reactive<FormState>({
 const loading = ref(false)
 const submitting = ref(false)
 const errorMessage = ref('')
+const successMessage = ref('')
 const isUploadingImage = ref(false)
 const isUploadingAudio = ref(false)
+const isUploadingVideo = ref(false)
 const previewErrorMessage = ref('')
 const previewCatalog = ref<Memory[]>([])
 const previewDetailMemory = ref<Memory | null>(null)
@@ -97,6 +101,7 @@ const previewFormMemory = computed<Memory>(() => {
       text: form.text || undefined,
       imageUrl: form.imageUrl || undefined,
       audioUrl: form.audioUrl || undefined,
+      videoUrl: form.videoUrl || undefined,
       location: form.location || undefined,
       theme: form.theme || undefined,
     },
@@ -118,6 +123,7 @@ const applyMemoryToForm = (memory: Memory) => {
   form.text = memory.content.text ?? ''
   form.imageUrl = memory.content.imageUrl ?? ''
   form.audioUrl = memory.content.audioUrl ?? ''
+  form.videoUrl = memory.content.videoUrl ?? ''
   form.location = memory.content.location ?? ''
   form.theme = memory.content.theme ?? 'default'
 }
@@ -137,6 +143,7 @@ const buildCreatePayload = (): Omit<Memory, 'id'> => {
       text: form.text || undefined,
       imageUrl: form.imageUrl || undefined,
       audioUrl: form.audioUrl || undefined,
+      videoUrl: form.videoUrl || undefined,
       location: form.location || undefined,
       theme: form.theme || undefined,
     },
@@ -158,6 +165,7 @@ const buildUpdatePayload = (): Omit<Memory, 'id'> => {
       text: form.text || undefined,
       imageUrl: form.imageUrl || undefined,
       audioUrl: form.audioUrl || undefined,
+      videoUrl: form.videoUrl || undefined,
       location: form.location || undefined,
       theme: form.theme || undefined,
     },
@@ -183,21 +191,29 @@ const refillAutoPosition = () => {
   form.orbitRadius = Number((1.05 + Math.random() * 0.1).toFixed(4))
 }
 
-const uploadFile = async (file: File, target: 'image' | 'audio') => {
+const uploadFile = async (file: File, target: 'image' | 'audio' | 'video') => {
   errorMessage.value = ''
+  successMessage.value = ''
   if (target === 'image') {
     isUploadingImage.value = true
-  } else {
+  } else if (target === 'audio') {
     isUploadingAudio.value = true
+  } else {
+    isUploadingVideo.value = true
   }
   try {
     const url = await uploadAdminMedia(file)
     if (target === 'image') {
       form.imageUrl = url
-    } else {
+    } else if (target === 'audio') {
       form.audioUrl = url
+    } else {
+      form.videoUrl = url
     }
+    const targetLabel = target === 'image' ? '图片' : target === 'audio' ? '音频' : '视频'
+    successMessage.value = `${targetLabel}上传成功，链接已自动填入表单`
   } catch (error) {
+    successMessage.value = ''
     if (error instanceof Error) {
       errorMessage.value = error.message
     } else {
@@ -206,8 +222,10 @@ const uploadFile = async (file: File, target: 'image' | 'audio') => {
   } finally {
     if (target === 'image') {
       isUploadingImage.value = false
-    } else {
+    } else if (target === 'audio') {
       isUploadingAudio.value = false
+    } else {
+      isUploadingVideo.value = false
     }
   }
 }
@@ -217,7 +235,6 @@ const handleUploadImage = async (event: Event) => {
   const file = input.files?.[0]
   if (!file) return
   await uploadFile(file, 'image')
-  input.value = ''
 }
 
 const handleUploadAudio = async (event: Event) => {
@@ -225,7 +242,13 @@ const handleUploadAudio = async (event: Event) => {
   const file = input.files?.[0]
   if (!file) return
   await uploadFile(file, 'audio')
-  input.value = ''
+}
+
+const handleUploadVideo = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  await uploadFile(file, 'video')
 }
 
 const handleSubmit = async () => {
@@ -364,6 +387,10 @@ onMounted(async () => {
             上传音频
             <input type="file" accept="audio/mpeg,audio/mp3" @change="handleUploadAudio" />
           </label>
+          <label class="upload-field">
+            上传视频
+            <input type="file" accept="video/*" @change="handleUploadVideo" />
+          </label>
         </div>
 
         <fieldset class="advanced">
@@ -386,10 +413,17 @@ onMounted(async () => {
         </fieldset>
 
         <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
-        <p class="hint" v-if="isUploadingImage || isUploadingAudio">
+        <p v-if="successMessage" class="success">{{ successMessage }}</p>
+        <p class="hint" v-if="isUploadingImage || isUploadingAudio || isUploadingVideo">
           {{ isUploadingImage ? '图片上传中...' : '' }}
           {{ isUploadingAudio ? '音频上传中...' : '' }}
+          {{ isUploadingVideo ? '视频上传中...' : '' }}
         </p>
+        <div class="upload-result" v-if="form.imageUrl || form.audioUrl || form.videoUrl">
+          <p class="hint" v-if="form.imageUrl">图片链接：{{ form.imageUrl }}</p>
+          <p class="hint" v-if="form.audioUrl">音频链接：{{ form.audioUrl }}</p>
+          <p class="hint" v-if="form.videoUrl">视频链接：{{ form.videoUrl }}</p>
+        </div>
 
         <div class="footer">
           <RouterLink :to="{ name: 'AdminMemoryList' }">取消</RouterLink>
@@ -573,10 +607,24 @@ button:disabled {
   color: #b72929;
 }
 
+.success {
+  margin: 0;
+  color: #1e7a35;
+}
+
 .hint {
   margin: 0;
   color: #5d6989;
   font-size: 0.9rem;
+}
+
+.upload-result {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.upload-result .hint {
+  word-break: break-all;
 }
 
 .field-label {
