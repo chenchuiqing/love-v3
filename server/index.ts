@@ -38,6 +38,7 @@ app.all('/api/*', (c) => {
   return c.json({ message: '接口不存在' }, 404)
 })
 
+app.use('/*', serveStatic({ root: './dist' }))
 app.get('*', serveStatic({ root: './dist', path: 'index.html' }))
 
 const server = Bun.serve({
