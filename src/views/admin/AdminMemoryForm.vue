@@ -32,20 +32,27 @@ interface FormState {
 const route = useRoute()
 const router = useRouter()
 
-const typeOptions: MemoryType[] = ['photo', 'date', 'chat', 'location', 'music']
-const themeOptions: ParticleTheme[] = [
-  'default',
-  'ocean',
-  'forest',
-  'city',
-  'sky',
-  'summit',
-  'sunshine',
-  'meadow',
-  'night',
-  'fireworks',
-  'moonlight',
-  'neon',
+const memoryTypeOptions: { value: MemoryType; label: string }[] = [
+  { value: 'photo', label: '照片' },
+  { value: 'date', label: '纪念日' },
+  { value: 'chat', label: '对话' },
+  { value: 'location', label: '地点' },
+  { value: 'music', label: '音乐' },
+]
+
+const particleThemeOptions: { value: ParticleTheme; label: string }[] = [
+  { value: 'default', label: '默认' },
+  { value: 'ocean', label: '海洋' },
+  { value: 'forest', label: '森林' },
+  { value: 'city', label: '城市' },
+  { value: 'sky', label: '晴空' },
+  { value: 'summit', label: '山野登山' },
+  { value: 'sunshine', label: '暖阳' },
+  { value: 'meadow', label: '草地春光' },
+  { value: 'night', label: '夜景' },
+  { value: 'fireworks', label: '烟花' },
+  { value: 'moonlight', label: '月光' },
+  { value: 'neon', label: '霓虹' },
 ]
 
 const form = reactive<FormState>({
@@ -223,8 +230,12 @@ const handleUploadAudio = async (event: Event) => {
 
 const handleSubmit = async () => {
   errorMessage.value = ''
-  if (!form.title || !form.date) {
-    errorMessage.value = '请先填写标题和日期'
+  if (!form.title.trim()) {
+    errorMessage.value = '请填写标题'
+    return
+  }
+  if (!form.date.trim()) {
+    errorMessage.value = '请填写日期'
     return
   }
 
@@ -287,21 +298,31 @@ onMounted(async () => {
     <div v-else class="layout">
       <form class="form" @submit.prevent="handleSubmit">
         <label>
-          标题
-          <input v-model.trim="form.title" />
+          <span class="field-label">标题<span class="required">*</span></span>
+          <input v-model.trim="form.title" required />
         </label>
 
         <div class="row">
           <label>
             类型
             <select v-model="form.type">
-              <option v-for="item in typeOptions" :key="item" :value="item">{{ item }}</option>
+              <option
+                v-for="item in memoryTypeOptions"
+                :key="item.value"
+                :value="item.value"
+              >
+                {{ item.label }}
+              </option>
             </select>
           </label>
 
           <label>
-            日期
-            <input v-model.trim="form.date" placeholder="例如 2025-05-20" />
+            <span class="field-label">日期<span class="required">*</span></span>
+            <input
+              v-model.trim="form.date"
+              required
+              placeholder="例如 2025-05-20"
+            />
           </label>
         </div>
 
@@ -313,7 +334,13 @@ onMounted(async () => {
           <label>
             粒子主题
             <select v-model="form.theme">
-              <option v-for="item in themeOptions" :key="item" :value="item">{{ item }}</option>
+              <option
+                v-for="item in particleThemeOptions"
+                :key="item.value"
+                :value="item.value"
+              >
+                {{ item.label }}
+              </option>
             </select>
           </label>
         </div>
@@ -323,28 +350,17 @@ onMounted(async () => {
           <textarea v-model.trim="form.text" rows="4"></textarea>
         </label>
 
-        <div class="row">
-          <label>
-            地点
-            <input v-model.trim="form.location" />
-          </label>
-          <label>
-            音频地址
-            <input v-model.trim="form.audioUrl" />
-          </label>
-        </div>
-
         <label>
-          图片地址
-          <input v-model.trim="form.imageUrl" />
+          地点
+          <input v-model.trim="form.location" />
         </label>
 
-        <div class="row upload-row">
-          <label>
+        <div class="upload-row">
+          <label class="upload-field">
             上传图片
             <input type="file" accept="image/*" @change="handleUploadImage" />
           </label>
-          <label>
+          <label class="upload-field">
             上传音频
             <input type="file" accept="audio/mpeg,audio/mp3" @change="handleUploadAudio" />
           </label>
@@ -442,8 +458,21 @@ onMounted(async () => {
   gap: 0.7rem;
 }
 
+.row > label {
+  min-width: 0;
+}
+
 .upload-row {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.7rem;
+}
+
+.upload-field {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  font-size: 0.9rem;
 }
 
 label {
@@ -464,6 +493,14 @@ textarea {
 
 textarea {
   resize: vertical;
+}
+
+.upload-field input[type='file'] {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.82rem;
 }
 
 .advanced {
@@ -542,13 +579,21 @@ button:disabled {
   font-size: 0.9rem;
 }
 
+.field-label {
+  font-size: 0.9rem;
+}
+
+.required {
+  margin-left: 0.15rem;
+  color: #b72929;
+}
+
 @media (max-width: 780px) {
   .layout {
     grid-template-columns: 1fr;
   }
 
-  .row,
-  .upload-row {
+  .row {
     grid-template-columns: 1fr;
   }
 }
