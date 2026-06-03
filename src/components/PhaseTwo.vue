@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import type { Memory, PlanetPhase } from '@/types/memory'
-import { memories } from '@/data/memories'
+import { fetchMemories } from '@/api/memories'
 import MemoryPlanet from './MemoryPlanet.vue'
 import MemoryDetail from './MemoryDetail.vue'
 
@@ -13,6 +13,9 @@ const props = defineProps<{
 const phase = ref<PlanetPhase>(props.resumeExploring ? 'exploring' : 'forming')
 const activeMemory = ref<Memory | null>(null)
 const visitedIds = ref(new Set<string>(props.initialVisitedIds ?? []))
+const memories = ref<Memory[]>([])
+const isLoading = ref(true)
+const loadError = ref('')
 
 const emit = defineEmits<{
   (e: 'complete'): void
@@ -91,6 +94,18 @@ const handleAwakeningComplete = () => {
 }
 
 onMounted(() => {
+  fetchMemories()
+    .then((list) => {
+      memories.value = list
+    })
+    .catch((error: unknown) => {
+      loadError.value = error instanceof Error ? error.message : '加载记忆失败'
+      memories.value = []
+    })
+    .finally(() => {
+      isLoading.value = false
+    })
+
   if (props.resumeExploring && visitedIds.value.size > 0) {
     syncVisitedToParent()
   }
@@ -103,7 +118,13 @@ onUnmounted(() => {
 
 <template>
   <div class="phase-two">
+    <p v-if="isLoading" class="load-status">正在加载记忆...</p>
+    <p v-else-if="loadError" class="load-status load-status--error">
+      记忆加载失败：{{ loadError }}
+    </p>
+
     <MemoryPlanet
+      v-if="!isLoading"
       :phase="phase"
       :memories="memories"
       :active-memory="activeMemory"
@@ -116,6 +137,13 @@ onUnmounted(() => {
       @return-complete="handleReturnComplete"
       @awakening-complete="handleAwakeningComplete"
     />
+
+    <p
+      v-if="!isLoading && !loadError && memories.length === 0"
+      class="load-status"
+    >
+      暂无记忆点，请在后台添加或执行 bun run seed
+    </p>
 
     <Transition
       enter-active-class="transition-opacity duration-500"
@@ -168,5 +196,24 @@ onUnmounted(() => {
   font-size: 0.78rem;
   letter-spacing: 0.03em;
   z-index: 10;
+}
+
+.load-status {
+  position: absolute;
+  top: 1.2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 0.42rem 0.85rem;
+  border-radius: 999px;
+  background: rgba(24, 24, 36, 0.65);
+  color: #e5ecff;
+  font-size: 0.76rem;
+  z-index: 11;
+}
+
+.load-status--error {
+  background: rgba(80, 28, 28, 0.62);
+  color: #ffe3e3;
 }
 </style>

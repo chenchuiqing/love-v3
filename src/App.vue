@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { RouterView, useRoute } from 'vue-router'
 import PhaseOne from './components/PhaseOne.vue';
 import PhaseTwo from './components/PhaseTwo.vue';
 import PhaseThree from './components/PhaseThree.vue';
 import FloatingMusicPlayer from './components/FloatingMusicPlayer.vue';
+
+const route = useRoute()
+const isAdminRoute = computed(() => route.path.startsWith('/admin'))
 
 const currentPhase = ref(1);
 const phaseTwoResume = ref(false);
@@ -79,7 +83,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <main ref="appRef" class="app-root">
+  <RouterView v-if="isAdminRoute" />
+
+  <main v-else ref="appRef" class="app-root">
     <!-- 全局全屏按钮 -->
     <button class="fullscreen-button" @click="toggleFullscreen">
       {{ isFullscreen ? '退出全屏' : '进入全屏' }}

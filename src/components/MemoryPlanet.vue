@@ -342,6 +342,57 @@ const createOrbitParticles = () => {
   planetGroup.add(orbitPoints)
 }
 
+const clearMemoryNodes = () => {
+  if (!planetGroup) return
+
+  nodeWrappers.forEach((wrapper) => {
+    planetGroup.remove(wrapper)
+  })
+  nodeSprites.forEach((sprite) => {
+    sprite.material.map?.dispose()
+    sprite.material.dispose()
+  })
+  nodeSprites = []
+  nodeWrappers = []
+}
+
+const applyNodeVisibilityForCurrentPhase = () => {
+  if (nodeSprites.length === 0) return
+
+  if (props.phase === 'forming') {
+    return
+  }
+
+  if (props.phase === 'exploring' || props.phase === 'returning') {
+    nodeSprites.forEach((sprite) => {
+      if (!sprite.userData.visited) {
+        sprite.material.opacity = 0.9
+      }
+    })
+    props.initialVisitedIds?.forEach((memoryId) => {
+      markNodeVisited(memoryId)
+    })
+    if (visitedIds.size >= CORE_ACTIVATE_THRESHOLD) {
+      activateCore()
+    }
+    return
+  }
+
+  if (props.phase === 'zooming' || props.phase === 'viewing' || props.phase === 'awakening') {
+    nodeSprites.forEach((sprite) => {
+      sprite.material.opacity = 0
+    })
+  }
+}
+
+const syncMemoryNodes = () => {
+  if (!planetGroup) return
+
+  clearMemoryNodes()
+  createMemoryNodes()
+  applyNodeVisibilityForCurrentPhase()
+}
+
 const createMemoryNodes = () => {
   props.memories.forEach((memory) => {
     const position = sphericalToCartesian(
@@ -1063,6 +1114,15 @@ const handleResize = () => {
     }
   }
 }
+
+watch(
+  () => props.memories,
+  () => {
+    if (!planetGroup) return
+    syncMemoryNodes()
+  },
+  { deep: true },
+)
 
 watch(() => props.phase, (newPhase) => {
   switch (newPhase) {
