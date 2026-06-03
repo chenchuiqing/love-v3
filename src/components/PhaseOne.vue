@@ -370,6 +370,9 @@ onBeforeUnmount(() => {
     @pointerup="handlePointerUp"
     @pointerleave="handlePointerUp"
     @contextmenu.prevent
+    @selectstart.prevent
+    @copy.prevent
+    @cut.prevent
   >
     <div ref="containerRef" class="canvas-layer"></div>
     
@@ -382,7 +385,6 @@ onBeforeUnmount(() => {
         <div class="hint-core"></div>
       </div>
       <p class="hint-title">按住星尘</p>
-      <p class="hint-subtitle">让它为你汇聚成唯一</p>
     </div>
   </div>
 </template>
@@ -395,7 +397,16 @@ onBeforeUnmount(() => {
   overflow: hidden;
   background: radial-gradient(circle at 50% 45%, #072448 0%, #000010 70%);
   cursor: pointer;
+  touch-action: none;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.phase-one * {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .canvas-layer {
@@ -451,13 +462,6 @@ onBeforeUnmount(() => {
   letter-spacing: 0.28em;
   color: rgba(236, 247, 255, 0.96);
   text-shadow: 0 0 16px rgba(145, 205, 255, 0.45);
-}
-
-.hint-subtitle {
-  margin: 0;
-  font-size: clamp(0.72rem, 1.1vw, 0.88rem);
-  letter-spacing: 0.13em;
-  color: rgba(192, 218, 241, 0.78);
 }
 
 @keyframes breath {

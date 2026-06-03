@@ -8,6 +8,8 @@ const props = defineProps<{
   phase: PlanetPhase
   memories: Memory[]
   activeMemory: Memory | null
+  skipForming?: boolean
+  initialVisitedIds?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -20,6 +22,18 @@ const emit = defineEmits<{
 }>()
 
 const containerRef = ref<HTMLElement | null>(null)
+const meteorCanvasRef = ref<HTMLCanvasElement | null>(null)
+
+interface MeteorData {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  tailLength: number
+  opacity: number
+  age: number
+  maxAge: number
+}
 
 let scene: THREE.Scene
 let camera: THREE.PerspectiveCamera
@@ -30,10 +44,20 @@ let starfieldPoints: THREE.Points
 let planetPoints: THREE.Points
 let orbitPoints: THREE.Points
 let nodeSprites: THREE.Sprite[] = []
+let nodeWrappers: THREE.Group[] = []
 let coreSprite: THREE.Sprite | null = null
+let coreWrapper: THREE.Group | null = null
 let raycaster: THREE.Raycaster
 let mouse: THREE.Vector2
 let corePulseTween: gsap.core.Tween | null = null
+
+let meteorCtx: CanvasRenderingContext2D | null = null
+let meteors: MeteorData[] = []
+let nextMeteorTime = 0
+let isShowerActive = false
+let showerEndTime = 0
+let nextShowerSpawnTime = 0
+let lastFrameTime = 0
 
 let planetGeometry: THREE.BufferGeometry
 let orbitGeometry: THREE.BufferGeometry
@@ -47,11 +71,26 @@ let previousMousePosition = { x: 0, y: 0 }
 let rotationVelocity = { x: 0, y: 0 }
 let hoveredSprite: THREE.Sprite | null = null
 
+const activePointers = new Map<number, { x: number; y: number }>()
+let isPinching = false
+let lastPinchDistance = 0
+let suppressNextClick = false
+
 const PLANET_PARTICLE_COUNT = 35000
 const ORBIT_PARTICLE_COUNT = 5000
 const STARFIELD_PARTICLE_COUNT = 3000
 const PLANET_RADIUS = 1.5
 const INITIAL_CAMERA_Z = 5
+/** 最近：贴近球面浏览密集记忆点 */
+const MIN_CAMERA_Z = 1.12
+/** 最远：俯瞰整颗星球（适合上百个记忆点） */
+const MAX_CAMERA_Z = 22
+/** 拉近时标记几乎保持屏幕像素大小；拉远时指数 < 1 使标记缩小成概览点 */
+const MARKER_COMPENSATION_NEAR = 1
+const MARKER_COMPENSATION_FAR = 0.52
+const CORE_ACTIVATE_THRESHOLD = 3
+const VISITED_NODE_SCALE = 0.19
+const VISITED_NODE_HOVER_SCALE = 0.24
 
 const createGlowTexture = (color: string): THREE.CanvasTexture => {
   const canvas = document.createElement('canvas')
@@ -68,6 +107,33 @@ const createGlowTexture = (color: string): THREE.CanvasTexture => {
   ctx.fillStyle = gradient
   ctx.fillRect(0, 0, 64, 64)
   
+  return new THREE.CanvasTexture(canvas)
+}
+
+const createVisitedTexture = (color: string): THREE.CanvasTexture => {
+  const canvas = document.createElement('canvas')
+  canvas.width = 64
+  canvas.height = 64
+  const ctx = canvas.getContext('2d')!
+
+  const ringGradient = ctx.createRadialGradient(32, 32, 16, 32, 32, 26)
+  ringGradient.addColorStop(0, 'transparent')
+  ringGradient.addColorStop(0.4, color + '66')
+  ringGradient.addColorStop(0.72, color + 'dd')
+  ringGradient.addColorStop(0.88, color)
+  ringGradient.addColorStop(1, 'transparent')
+
+  ctx.fillStyle = ringGradient
+  ctx.fillRect(0, 0, 64, 64)
+
+  const centerDot = ctx.createRadialGradient(32, 32, 0, 32, 32, 5)
+  centerDot.addColorStop(0, 'rgba(255, 255, 255, 0.95)')
+  centerDot.addColorStop(0.6, color + 'aa')
+  centerDot.addColorStop(1, 'transparent')
+
+  ctx.fillStyle = centerDot
+  ctx.fillRect(0, 0, 64, 64)
+
   return new THREE.CanvasTexture(canvas)
 }
 
@@ -276,6 +342,57 @@ const createOrbitParticles = () => {
   planetGroup.add(orbitPoints)
 }
 
+const clearMemoryNodes = () => {
+  if (!planetGroup) return
+
+  nodeWrappers.forEach((wrapper) => {
+    planetGroup.remove(wrapper)
+  })
+  nodeSprites.forEach((sprite) => {
+    sprite.material.map?.dispose()
+    sprite.material.dispose()
+  })
+  nodeSprites = []
+  nodeWrappers = []
+}
+
+const applyNodeVisibilityForCurrentPhase = () => {
+  if (nodeSprites.length === 0) return
+
+  if (props.phase === 'forming') {
+    return
+  }
+
+  if (props.phase === 'exploring' || props.phase === 'returning') {
+    nodeSprites.forEach((sprite) => {
+      if (!sprite.userData.visited) {
+        sprite.material.opacity = 0.9
+      }
+    })
+    props.initialVisitedIds?.forEach((memoryId) => {
+      markNodeVisited(memoryId)
+    })
+    if (visitedIds.size >= CORE_ACTIVATE_THRESHOLD) {
+      activateCore()
+    }
+    return
+  }
+
+  if (props.phase === 'zooming' || props.phase === 'viewing' || props.phase === 'awakening') {
+    nodeSprites.forEach((sprite) => {
+      sprite.material.opacity = 0
+    })
+  }
+}
+
+const syncMemoryNodes = () => {
+  if (!planetGroup) return
+
+  clearMemoryNodes()
+  createMemoryNodes()
+  applyNodeVisibilityForCurrentPhase()
+}
+
 const createMemoryNodes = () => {
   props.memories.forEach((memory) => {
     const position = sphericalToCartesian(
@@ -293,13 +410,37 @@ const createMemoryNodes = () => {
     })
 
     const sprite = new THREE.Sprite(material)
-    sprite.position.copy(position)
     sprite.scale.set(0.25, 0.25, 1)
-    sprite.userData = { memory }
+    sprite.userData = { memory, visited: false }
+
+    const wrapper = new THREE.Group()
+    wrapper.position.copy(position)
+    wrapper.add(sprite)
 
     nodeSprites.push(sprite)
-    planetGroup.add(sprite)
+    nodeWrappers.push(wrapper)
+    planetGroup.add(wrapper)
   })
+}
+
+const markNodeVisited = (memoryId: string) => {
+  const sprite = nodeSprites.find((s) => s.userData.memory.id === memoryId)
+  if (!sprite || sprite.userData.visited) return
+
+  const memory = sprite.userData.memory as Memory
+  const visitedTexture = createVisitedTexture(memory.color)
+  const material = sprite.material as THREE.SpriteMaterial
+  material.map?.dispose()
+  material.map = visitedTexture
+  material.needsUpdate = true
+  sprite.userData.visited = true
+  gsap.to(material, { opacity: 1, duration: 0.3 })
+
+  gsap.fromTo(
+    sprite.scale,
+    { x: 0.35, y: 0.35 },
+    { x: VISITED_NODE_SCALE, y: VISITED_NODE_SCALE, duration: 0.5, ease: 'back.out(2)' }
+  )
 }
 
 const createCoreSprite = () => {
@@ -314,8 +455,11 @@ const createCoreSprite = () => {
 
   coreSprite = new THREE.Sprite(material)
   coreSprite.scale.set(0.15, 0.15, 1)
-  coreSprite.position.set(0, 0, 0)
-  planetGroup.add(coreSprite)
+
+  coreWrapper = new THREE.Group()
+  coreWrapper.position.set(0, 0, 0)
+  coreWrapper.add(coreSprite)
+  planetGroup.add(coreWrapper)
 }
 
 const activateCore = () => {
@@ -337,6 +481,38 @@ const activateCore = () => {
     yoyo: true,
     ease: 'sine.inOut'
   })
+}
+
+const applyFormedState = () => {
+  const planetPositions = planetGeometry.attributes.position.array as Float32Array
+  const orbitPositions = orbitGeometry.attributes.position.array as Float32Array
+
+  for (let i = 0; i < PLANET_PARTICLE_COUNT; i++) {
+    planetPositions[i * 3] = planetTargetPositions[i * 3]
+    planetPositions[i * 3 + 1] = planetTargetPositions[i * 3 + 1]
+    planetPositions[i * 3 + 2] = planetTargetPositions[i * 3 + 2]
+  }
+  planetGeometry.attributes.position.needsUpdate = true
+
+  for (let i = 0; i < ORBIT_PARTICLE_COUNT; i++) {
+    orbitPositions[i * 3] = orbitTargetPositions[i * 3]
+    orbitPositions[i * 3 + 1] = orbitTargetPositions[i * 3 + 1]
+    orbitPositions[i * 3 + 2] = orbitTargetPositions[i * 3 + 2]
+  }
+  orbitGeometry.attributes.position.needsUpdate = true
+
+  nodeSprites.forEach((sprite) => {
+    sprite.material.opacity = 0.9
+  })
+
+  props.initialVisitedIds?.forEach((memoryId) => {
+    visitedIds.add(memoryId)
+    markNodeVisited(memoryId)
+  })
+
+  if (visitedIds.size >= CORE_ACTIVATE_THRESHOLD) {
+    activateCore()
+  }
 }
 
 const animateForming = () => {
@@ -569,9 +745,62 @@ const animateAwakening = () => {
   }, 0)
 }
 
+const getPinchDistance = (): number => {
+  if (activePointers.size < 2) return 0
+  const pts = Array.from(activePointers.values())
+  return Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y)
+}
+
+const updatePinchState = () => {
+  if (activePointers.size >= 2) {
+    if (!isPinching) {
+      isPinching = true
+      isDragging = false
+      lastPinchDistance = getPinchDistance()
+    }
+    return
+  }
+  isPinching = false
+  lastPinchDistance = 0
+}
+
+const applyCameraZoomFactor = (factor: number) => {
+  if (!camera || factor <= 0 || Math.abs(factor - 1) <= 0.002) return
+  camera.position.z /= factor
+  camera.position.z = THREE.MathUtils.clamp(camera.position.z, MIN_CAMERA_Z, MAX_CAMERA_Z)
+}
+
+const applyPinchZoom = (distance: number) => {
+  if (lastPinchDistance <= 0) return
+
+  const scale = distance / lastPinchDistance
+  if (Math.abs(scale - 1) > 0.002) {
+    suppressNextClick = true
+    applyCameraZoomFactor(scale)
+  }
+  lastPinchDistance = distance
+}
+
+const getWheelZoomFactor = (deltaY: number): number => {
+  const zoomIntensity = 0.0011 * (camera.position.z / INITIAL_CAMERA_Z)
+  return Math.exp(-deltaY * zoomIntensity)
+}
+
+const handleWheel = (event: WheelEvent) => {
+  if (props.phase !== 'exploring') return
+  event.preventDefault()
+  applyCameraZoomFactor(getWheelZoomFactor(event.deltaY))
+}
+
 const handlePointerDown = (event: PointerEvent) => {
   if (props.phase !== 'exploring') return
-  
+
+  containerRef.value?.setPointerCapture(event.pointerId)
+  activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+  updatePinchState()
+
+  if (isPinching) return
+
   isDragging = true
   previousMousePosition = { x: event.clientX, y: event.clientY }
   rotationVelocity = { x: 0, y: 0 }
@@ -579,6 +808,16 @@ const handlePointerDown = (event: PointerEvent) => {
 
 const handlePointerMove = (event: PointerEvent) => {
   if (!containerRef.value) return
+
+  if (activePointers.has(event.pointerId)) {
+    activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+  }
+
+  if (isPinching && props.phase === 'exploring' && activePointers.size >= 2) {
+    event.preventDefault()
+    applyPinchZoom(getPinchDistance())
+    return
+  }
 
   const rect = containerRef.value.getBoundingClientRect()
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
@@ -607,18 +846,20 @@ const handlePointerMove = (event: PointerEvent) => {
       const isCore = coreSprite !== null && sprite === coreSprite
       if (hoveredSprite !== sprite) {
         if (hoveredSprite) {
-          gsap.to(hoveredSprite.scale, { x: 0.25, y: 0.25, duration: 0.3 })
+          const prevBase = hoveredSprite.userData.visited ? VISITED_NODE_SCALE : 0.25
+          gsap.to(hoveredSprite.scale, { x: prevBase, y: prevBase, duration: 0.3 })
           gsap.to(hoveredSprite.material, { opacity: 0.9, duration: 0.3 })
         }
         hoveredSprite = sprite
-        const targetScale = isCore ? 0.28 : 0.35
+        const targetScale = isCore ? 0.28 : sprite.userData.visited ? VISITED_NODE_HOVER_SCALE : 0.35
         gsap.to(sprite.scale, { x: targetScale, y: targetScale, duration: 0.3 })
         gsap.to(sprite.material, { opacity: 1, duration: 0.3 })
         document.body.style.cursor = 'pointer'
       }
     } else {
       if (hoveredSprite) {
-        gsap.to(hoveredSprite.scale, { x: 0.25, y: 0.25, duration: 0.3 })
+        const prevBase = hoveredSprite.userData.visited ? VISITED_NODE_SCALE : 0.25
+        gsap.to(hoveredSprite.scale, { x: prevBase, y: prevBase, duration: 0.3 })
         gsap.to(hoveredSprite.material, { opacity: 0.9, duration: 0.3 })
         hoveredSprite = null
         document.body.style.cursor = 'default'
@@ -627,12 +868,32 @@ const handlePointerMove = (event: PointerEvent) => {
   }
 }
 
-const handlePointerUp = () => {
-  isDragging = false
+const handlePointerUp = (event: PointerEvent) => {
+  if (containerRef.value?.hasPointerCapture(event.pointerId)) {
+    containerRef.value.releasePointerCapture(event.pointerId)
+  }
+
+  activePointers.delete(event.pointerId)
+  updatePinchState()
+
+  if (activePointers.size === 0) {
+    isDragging = false
+  } else if (!isPinching && activePointers.size === 1) {
+    const remaining = activePointers.values().next().value
+    if (remaining) {
+      isDragging = true
+      previousMousePosition = { x: remaining.x, y: remaining.y }
+      rotationVelocity = { x: 0, y: 0 }
+    }
+  }
 }
 
 const handleClick = (event: MouseEvent) => {
   if (props.phase !== 'exploring' || !containerRef.value) return
+  if (suppressNextClick) {
+    suppressNextClick = false
+    return
+  }
 
   const rect = containerRef.value.getBoundingClientRect()
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
@@ -654,10 +915,159 @@ const handleClick = (event: MouseEvent) => {
 
     const memory = sprite.userData.memory as Memory
     visitedIds.add(memory.id)
-    if (visitedIds.size >= props.memories.length) {
+    markNodeVisited(memory.id)
+    if (visitedIds.size >= CORE_ACTIVATE_THRESHOLD) {
       activateCore()
     }
     emit('nodeClick', memory)
+  }
+}
+
+const initMeteorCanvas = () => {
+  if (!meteorCanvasRef.value || !containerRef.value) return
+
+  const canvas = meteorCanvasRef.value
+  const dpr = Math.min(window.devicePixelRatio || 1, 2)
+  canvas.width = containerRef.value.clientWidth * dpr
+  canvas.height = containerRef.value.clientHeight * dpr
+  meteorCtx = canvas.getContext('2d')
+  if (meteorCtx) {
+    meteorCtx.scale(dpr, dpr)
+  }
+
+  nextMeteorTime = performance.now() + 3000 + Math.random() * 5000
+  lastFrameTime = performance.now()
+}
+
+const spawnMeteor = (fast = false) => {
+  if (!containerRef.value) return
+
+  const width = containerRef.value.clientWidth
+
+  const startX = Math.random() * width * 1.2 - width * 0.1
+  const startY = -50
+
+  const angleDeg = 25 + Math.random() * 25
+  const angleRad = (angleDeg * Math.PI) / 180
+
+  const baseSpeed = fast ? 1.4 + Math.random() * 0.4 : 0.8 + Math.random() * 0.5
+  const vx = Math.cos(angleRad) * baseSpeed
+  const vy = Math.sin(angleRad) * baseSpeed
+
+  const tailLength = 80 + Math.random() * 120
+  const maxAge = fast
+    ? 1000 + Math.random() * 600
+    : 1400 + Math.random() * 900
+
+  meteors.push({
+    x: startX,
+    y: startY,
+    vx,
+    vy,
+    tailLength,
+    opacity: 0.7 + Math.random() * 0.3,
+    age: 0,
+    maxAge,
+  })
+}
+
+const updateAndDrawMeteors = (now: number) => {
+  if (!meteorCtx || !meteorCanvasRef.value || !containerRef.value) return
+
+  const dt = Math.min(now - lastFrameTime, 64)
+  lastFrameTime = now
+
+  const width = containerRef.value.clientWidth
+  const height = containerRef.value.clientHeight
+
+  meteorCtx.clearRect(0, 0, width, height)
+
+  for (let i = meteors.length - 1; i >= 0; i--) {
+    const m = meteors[i]
+    m.x += m.vx * dt
+    m.y += m.vy * dt
+    m.age += dt
+
+    const fadeStart = m.maxAge * 0.75
+    let alpha = m.opacity
+    if (m.age > fadeStart) {
+      alpha = m.opacity * Math.max(0, 1 - (m.age - fadeStart) / (m.maxAge - fadeStart))
+    }
+
+    const dirLen = Math.hypot(m.vx, m.vy) || 1
+    const tailX = m.x - (m.vx / dirLen) * m.tailLength
+    const tailY = m.y - (m.vy / dirLen) * m.tailLength
+
+    const gradient = meteorCtx.createLinearGradient(tailX, tailY, m.x, m.y)
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0)')
+    gradient.addColorStop(0.7, `rgba(200, 220, 255, ${alpha * 0.5})`)
+    gradient.addColorStop(1, `rgba(255, 255, 255, ${alpha})`)
+
+    meteorCtx.strokeStyle = gradient
+    meteorCtx.lineWidth = 1.6
+    meteorCtx.lineCap = 'round'
+    meteorCtx.beginPath()
+    meteorCtx.moveTo(tailX, tailY)
+    meteorCtx.lineTo(m.x, m.y)
+    meteorCtx.stroke()
+
+    meteorCtx.beginPath()
+    meteorCtx.fillStyle = `rgba(255, 255, 255, ${alpha})`
+    meteorCtx.arc(m.x, m.y, 1.6, 0, Math.PI * 2)
+    meteorCtx.fill()
+
+    const offscreen = m.x > width + 100 || m.y > height + 100 || m.x < -200
+    if (m.age >= m.maxAge || offscreen) {
+      meteors.splice(i, 1)
+    }
+  }
+
+  if (isShowerActive) {
+    if (now >= showerEndTime) {
+      isShowerActive = false
+    } else if (now >= nextShowerSpawnTime) {
+      spawnMeteor(true)
+      nextShowerSpawnTime = now + 80 + Math.random() * 170
+    }
+  }
+
+  if (now >= nextMeteorTime) {
+    if (!isShowerActive && Math.random() < 0.03) {
+      isShowerActive = true
+      showerEndTime = now + 3000 + Math.random() * 4000
+      nextShowerSpawnTime = now
+    } else {
+      spawnMeteor(false)
+    }
+    nextMeteorTime = now + 8000 + Math.random() * 12000
+  }
+}
+
+/** 记忆点世界缩放：拉近时抵消透视放大，拉远时额外缩小便于概览 */
+const getMarkerWorldScale = (): number => {
+  const z = camera.position.z
+  const ratio = z / INITIAL_CAMERA_Z
+
+  if (ratio <= 1) {
+    return Math.pow(ratio, MARKER_COMPENSATION_NEAR)
+  }
+
+  const t = THREE.MathUtils.smoothstep(INITIAL_CAMERA_Z, MAX_CAMERA_Z, z)
+  const nearScale = 1
+  const farScale = Math.pow(ratio, MARKER_COMPENSATION_FAR)
+  return THREE.MathUtils.lerp(nearScale, farScale, t)
+}
+
+const updateZoomScales = () => {
+  if (!camera || props.phase !== 'exploring') return
+
+  const markerScale = getMarkerWorldScale()
+
+  nodeWrappers.forEach((wrapper) => {
+    wrapper.scale.set(markerScale, markerScale, 1)
+  })
+  if (coreWrapper) {
+    coreWrapper.scale.set(markerScale, markerScale, 1)
   }
 }
 
@@ -681,6 +1091,9 @@ const animate = () => {
     }
   }
 
+  updateZoomScales()
+  updateAndDrawMeteors(performance.now())
+
   renderer.render(scene, camera)
 }
 
@@ -690,7 +1103,26 @@ const handleResize = () => {
   camera.aspect = containerRef.value.clientWidth / containerRef.value.clientHeight
   camera.updateProjectionMatrix()
   renderer.setSize(containerRef.value.clientWidth, containerRef.value.clientHeight)
+
+  if (meteorCanvasRef.value) {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    meteorCanvasRef.value.width = containerRef.value.clientWidth * dpr
+    meteorCanvasRef.value.height = containerRef.value.clientHeight * dpr
+    if (meteorCtx) {
+      meteorCtx.setTransform(1, 0, 0, 1, 0, 0)
+      meteorCtx.scale(dpr, dpr)
+    }
+  }
 }
+
+watch(
+  () => props.memories,
+  () => {
+    if (!planetGroup) return
+    syncMemoryNodes()
+  },
+  { deep: true },
+)
 
 watch(() => props.phase, (newPhase) => {
   switch (newPhase) {
@@ -711,9 +1143,12 @@ watch(() => props.phase, (newPhase) => {
 
 onMounted(() => {
   initScene()
+  initMeteorCanvas()
   window.addEventListener('resize', handleResize)
 
-  if (props.phase === 'forming') {
+  if (props.skipForming) {
+    applyFormedState()
+  } else if (props.phase === 'forming') {
     animateForming()
   }
 })
@@ -738,7 +1173,12 @@ onUnmounted(() => {
   if (coreSprite) {
     coreSprite.material.dispose()
   }
+  nodeWrappers = []
+  coreWrapper = null
   corePulseTween?.kill()
+
+  meteors = []
+  meteorCtx = null
 })
 </script>
 
@@ -749,9 +1189,13 @@ onUnmounted(() => {
     @pointerdown="handlePointerDown"
     @pointermove="handlePointerMove"
     @pointerup="handlePointerUp"
+    @pointercancel="handlePointerUp"
     @pointerleave="handlePointerUp"
+    @wheel.prevent="handleWheel"
     @click="handleClick"
-  />
+  >
+    <canvas ref="meteorCanvasRef" class="meteor-canvas" />
+  </div>
 </template>
 
 <style scoped>
@@ -760,5 +1204,15 @@ onUnmounted(() => {
   inset: 0;
   width: 100%;
   height: 100%;
+  touch-action: none;
+}
+
+.meteor-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
 }
 </style>

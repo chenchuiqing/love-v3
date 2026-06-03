@@ -2,6 +2,8 @@
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import * as THREE from 'three'
 import type { Memory } from '@/types/memory'
+import { useMusicPlayerStore } from '@/stores/musicPlayer'
+import { AppleCard, AppleCardCarousel, AppleCarouselItem } from '@/components/ui/apple-card-carousel'
 
 const props = defineProps<{
   memory: Memory
@@ -13,11 +15,72 @@ const emit = defineEmits<{
 
 const containerRef = ref<HTMLElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
-const audioRef = ref<HTMLAudioElement | null>(null)
 
 const displayedText = ref('')
-const isImageLoaded = ref(false)
-const isPlaying = ref(false)
+
+const musicPlayer = useMusicPlayerStore()
+
+const isCurrentPlaying = computed(
+  () =>
+    !!props.memory.content.audioUrl &&
+    musicPlayer.isCurrentTrack(props.memory.content.audioUrl) &&
+    musicPlayer.isPlaying
+)
+
+const mediaImages = computed(() => {
+  const urls = props.memory.content.imageUrls
+  if (Array.isArray(urls) && urls.length > 0) {
+    return urls.filter((url): url is string => typeof url === 'string' && url.trim().length > 0).slice(0, 5)
+  }
+
+  if (props.memory.content.imageUrl) {
+    return [props.memory.content.imageUrl]
+  }
+
+  return []
+})
+
+type MediaCardItem = {
+  src: string
+  title: string
+  category: string
+  mediaType: 'image' | 'video' | 'audio'
+  mediaUrl: string
+}
+
+const mediaCards = computed<MediaCardItem[]>(() => {
+  const photoItems = mediaImages.value.map((src, index) => ({
+    src,
+    title: `${props.memory.title} #${index + 1}`,
+    category: '回忆照片',
+    mediaType: 'image' as const,
+    mediaUrl: src,
+  }))
+
+  const cards: MediaCardItem[] = [...photoItems]
+
+  if (props.memory.content.videoUrl) {
+    cards.push({
+      src: props.memory.content.videoUrl,
+      title: `${props.memory.title} · 视频`,
+      category: '回忆视频',
+      mediaType: 'video',
+      mediaUrl: props.memory.content.videoUrl,
+    })
+  }
+
+  if (props.memory.content.audioUrl) {
+    cards.push({
+      src: mediaImages.value[0] ?? 'https://placehold.co/640x900/0f172a/e2e8f0?text=Music',
+      title: `${props.memory.title} · 音乐`,
+      category: '回忆音乐',
+      mediaType: 'audio',
+      mediaUrl: props.memory.content.audioUrl,
+    })
+  }
+
+  return cards
+})
 
 let scene: THREE.Scene
 let camera: THREE.PerspectiveCamera
@@ -37,6 +100,22 @@ const themeColors = computed(() => {
       return { primary: '#0a4a2e', secondary: '#1a6b48', accent: '#2ecc71' }
     case 'city':
       return { primary: '#2a1a4a', secondary: '#4a2a7a', accent: '#9b59b6' }
+    case 'sky':
+      return { primary: '#1e6a9e', secondary: '#4a9fd4', accent: '#9ed4f5' }
+    case 'summit':
+      return { primary: '#1a5268', secondary: '#2d7a8c', accent: '#7ec8b8' }
+    case 'sunshine':
+      return { primary: '#4a5020', secondary: '#7a8040', accent: '#f0d060' }
+    case 'meadow':
+      return { primary: '#2a6040', secondary: '#4a9060', accent: '#b8e8a0' }
+    case 'night':
+      return { primary: '#05070a', secondary: '#141a22', accent: '#5a6578' }
+    case 'fireworks':
+      return { primary: '#07050a', secondary: '#2a1420', accent: '#e8944a' }
+    case 'moonlight':
+      return { primary: '#030508', secondary: '#0c1420', accent: '#a8bcd8' }
+    case 'neon':
+      return { primary: '#05030a', secondary: '#1a0f2e', accent: '#67e8d0' }
     default:
       return { primary: '#0a1a3a', secondary: '#1a3a6a', accent: '#4a6a9a' }
   }
@@ -172,23 +251,15 @@ const startTypewriter = () => {
   }, 80)
 }
 
-const handleImageLoad = () => {
-  isImageLoaded.value = true
-}
+const toggleAudio = async () => {
+  const url = props.memory.content.audioUrl
+  if (!url) return
 
-const toggleAudio = () => {
-  if (!audioRef.value) return
-
-  if (isPlaying.value) {
-    audioRef.value.pause()
+  if (musicPlayer.isCurrentTrack(url)) {
+    await musicPlayer.toggle()
   } else {
-    audioRef.value.play()
+    await musicPlayer.play(url, props.memory.title, mediaImages.value[0] ?? props.memory.content.imageUrl)
   }
-  isPlaying.value = !isPlaying.value
-}
-
-const handleAudioEnded = () => {
-  isPlaying.value = false
 }
 
 const handleClose = () => {
@@ -205,9 +276,7 @@ const handleResize = () => {
 
 watch(() => props.memory, () => {
   displayedText.value = ''
-  isImageLoaded.value = false
-  isPlaying.value = false
-  
+
   setTimeout(() => {
     startTypewriter()
   }, 500)
@@ -225,10 +294,6 @@ onMounted(() => {
 onUnmounted(() => {
   cancelAnimationFrame(animationId)
   window.removeEventListener('resize', handleResize)
-
-  if (audioRef.value) {
-    audioRef.value.pause()
-  }
 
   if (renderer) {
     renderer.dispose()
@@ -253,14 +318,64 @@ onUnmounted(() => {
         {{ memory.title }}
       </h2>
 
-      <div v-if="memory.content.imageUrl" class="image-container">
-        <img
-          :src="memory.content.imageUrl"
-          :alt="memory.title"
-          loading="lazy"
-          :class="{ 'is-loaded': isImageLoaded }"
-          @load="handleImageLoad"
-        />
+      <div
+        v-if="mediaCards.length > 0"
+        class="media-layout"
+      >
+        <section v-if="mediaCards.length > 0" class="media-card photo-card">
+          <div class="card-head">
+            <span class="card-title">媒体集</span>
+            <span class="card-meta">{{ mediaCards.length }} 张/段</span>
+          </div>
+
+          <AppleCardCarousel
+            :initial-scroll="0"
+            :item-count="mediaCards.length"
+            class="photo-carousel-shell"
+          >
+            <AppleCarouselItem
+              v-for="(card, index) in mediaCards"
+              :key="`${card.src}-${index}`"
+              :index="index"
+              :trailing-space="mediaCards.length > 2"
+            >
+              <AppleCard
+                :card="card"
+                :index="index"
+                :layout="true"
+              >
+                <img
+                  v-if="card.mediaType === 'image'"
+                  :src="card.src"
+                  :alt="card.title"
+                  class="photo-expanded-image"
+                  loading="lazy"
+                />
+                <video
+                  v-else-if="card.mediaType === 'video'"
+                  class="media-expanded-video"
+                  :src="card.mediaUrl"
+                  :poster="card.src"
+                  controls
+                  playsinline
+                  preload="metadata"
+                />
+                <div v-else class="audio-expanded-card">
+                  <div class="audio-symbol">♫</div>
+                  <p class="audio-title">{{ memory.title }}</p>
+                  <button
+                    class="play-button"
+                    @click.stop="toggleAudio"
+                  >
+                    <span v-if="isCurrentPlaying">⏸</span>
+                    <span v-else>▶</span>
+                    {{ isCurrentPlaying ? '暂停播放' : '播放音乐' }}
+                  </button>
+                </div>
+              </AppleCard>
+            </AppleCarouselItem>
+          </AppleCardCarousel>
+        </section>
       </div>
 
       <p class="memory-text">
@@ -270,22 +385,6 @@ onUnmounted(() => {
       <div v-if="memory.content.location" class="location-tag">
         <span class="location-icon">📍</span>
         {{ memory.content.location }}
-      </div>
-
-      <div v-if="memory.content.audioUrl" class="audio-controls">
-        <audio
-          ref="audioRef"
-          :src="memory.content.audioUrl"
-          @ended="handleAudioEnded"
-        />
-        <button
-          class="play-button"
-          @click="toggleAudio"
-        >
-          <span v-if="isPlaying">⏸</span>
-          <span v-else>▶</span>
-          {{ isPlaying ? '暂停' : '播放' }}
-        </button>
       </div>
 
       <button class="back-button" @click="handleClose">
@@ -305,6 +404,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
 .particle-canvas {
@@ -318,14 +418,44 @@ onUnmounted(() => {
 .content-wrapper {
   position: relative;
   z-index: 10;
-  max-width: 600px;
+  max-width: 760px;
   width: 90%;
+  max-height: 100dvh;
+  box-sizing: border-box;
   padding: 2rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1.5rem;
   text-align: center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.content-wrapper::-webkit-scrollbar {
+  display: none;
+}
+
+.content-wrapper > * {
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .content-wrapper {
+    width: 100%;
+    padding: 1.25rem 1rem 1.5rem;
+    gap: 1rem;
+  }
+
+  .memory-title {
+    font-size: 1.5rem;
+  }
+
+  .media-card {
+    padding: 0.65rem;
+  }
 }
 
 .date-badge {
@@ -347,26 +477,87 @@ onUnmounted(() => {
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
 
-.image-container {
+.media-layout {
   width: 100%;
-  max-width: 400px;
-  aspect-ratio: 4/3;
+  display: grid;
+  gap: 0.85rem;
+  max-width: 700px;
+}
+
+.media-card {
+  padding: 0.8rem;
   border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(12, 20, 35, 0.5);
+  backdrop-filter: blur(10px);
+}
+
+.photo-card {
+  width: min(100%, 36rem);
+  justify-self: center;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.image-container img {
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.65rem;
+}
+
+.card-title {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.card-meta {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.photo-carousel-shell {
+  margin-top: -0.35rem;
+  margin-bottom: -0.25rem;
+}
+
+.photo-expanded-image {
+  display: block;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
-  opacity: 0;
-  transition: opacity 0.5s ease;
+  max-height: min(78vh, 760px);
+  object-fit: contain;
+  border-radius: 1rem;
 }
 
-.image-container img.is-loaded {
-  opacity: 1;
+.media-expanded-video {
+  display: block;
+  width: 100%;
+  max-height: min(78vh, 760px);
+  border-radius: 1rem;
+  background: #020617;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.audio-expanded-card {
+  display: grid;
+  gap: 1rem;
+  justify-items: center;
+  align-content: center;
+  min-height: 260px;
+  padding: 1.25rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(8, 15, 28, 0.65);
+}
+
+.audio-symbol {
+  font-size: 2.4rem;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.audio-title {
+  margin: 0;
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .memory-text {
@@ -401,10 +592,6 @@ onUnmounted(() => {
 
 .location-icon {
   font-size: 1rem;
-}
-
-.audio-controls {
-  margin-top: 0.5rem;
 }
 
 .play-button {

@@ -1,10 +1,17 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { RouterView, useRoute } from 'vue-router'
 import PhaseOne from './components/PhaseOne.vue';
 import PhaseTwo from './components/PhaseTwo.vue';
 import PhaseThree from './components/PhaseThree.vue';
+import FloatingMusicPlayer from './components/FloatingMusicPlayer.vue';
+
+const route = useRoute()
+const isAdminRoute = computed(() => route.path.startsWith('/admin'))
 
 const currentPhase = ref(1);
+const phaseTwoResume = ref(false);
+const visitedMemoryIds = ref(new Set<string>());
 const isTransitioning = ref(false);
 const isFullscreen = ref(false);
 const appRef = ref<HTMLElement | null>(null);
@@ -20,6 +27,7 @@ const handlePhaseOneComplete = () => {
 };
 
 const handlePhaseTwoComplete = () => {
+  phaseTwoResume.value = false;
   isTransitioning.value = true;
   setTimeout(() => {
     currentPhase.value = 3;
@@ -27,6 +35,21 @@ const handlePhaseTwoComplete = () => {
       isTransitioning.value = false;
     }, 1200);
   }, 800);
+};
+
+const handleBackToPlanet = () => {
+  isTransitioning.value = true;
+  setTimeout(() => {
+    phaseTwoResume.value = true;
+    currentPhase.value = 2;
+    setTimeout(() => {
+      isTransitioning.value = false;
+    }, 1200);
+  }, 800);
+};
+
+const handleVisitedUpdate = (ids: string[]) => {
+  visitedMemoryIds.value = new Set(ids);
 };
 
 const handleAct1Complete = () => {
@@ -50,17 +73,49 @@ const syncFullscreenState = () => {
   isFullscreen.value = !!document.fullscreenElement;
 };
 
+const applyScrollModeByRoute = (adminMode: boolean) => {
+  const appRoot = document.getElementById('app')
+  if (!appRoot) return
+
+  if (adminMode) {
+    document.documentElement.style.overflow = 'auto'
+    document.body.style.overflow = 'auto'
+    appRoot.style.height = 'auto'
+    appRoot.style.minHeight = '100%'
+    return
+  }
+
+  document.documentElement.style.overflow = 'hidden'
+  document.body.style.overflow = 'hidden'
+  appRoot.style.height = '100%'
+  appRoot.style.minHeight = ''
+}
+
 onMounted(() => {
   document.addEventListener('fullscreenchange', syncFullscreenState);
+  applyScrollModeByRoute(isAdminRoute.value)
 });
+
+watch(isAdminRoute, (nextValue) => {
+  applyScrollModeByRoute(nextValue)
+})
 
 onUnmounted(() => {
   document.removeEventListener('fullscreenchange', syncFullscreenState);
+  document.documentElement.style.overflow = ''
+  document.body.style.overflow = ''
+  const appRoot = document.getElementById('app')
+  if (appRoot) {
+    appRoot.style.height = ''
+    appRoot.style.minHeight = ''
+  }
 });
 </script>
 
 <template>
-  <main ref="appRef" class="app-root">
+  <RouterView v-if="isAdminRoute" />
+
+  <main v-else ref="appRef" class="app-root">
     <!-- 全局全屏按钮 -->
     <button class="fullscreen-button" @click="toggleFullscreen">
       {{ isFullscreen ? '退出全屏' : '进入全屏' }}
@@ -81,13 +136,26 @@ onUnmounted(() => {
     
     <!-- 第二阶段：记忆星球 -->
     <Transition name="phase-fade">
-      <PhaseTwo v-if="currentPhase === 2" @complete="handlePhaseTwoComplete" />
+      <PhaseTwo
+        v-if="currentPhase === 2"
+        :resume-exploring="phaseTwoResume"
+        :initial-visited-ids="phaseTwoResume ? Array.from(visitedMemoryIds) : undefined"
+        @visited-update="handleVisitedUpdate"
+        @complete="handlePhaseTwoComplete"
+      />
     </Transition>
 
     <!-- 第三阶段：手绘爱心 -->
     <Transition name="phase-fade">
-      <PhaseThree v-if="currentPhase === 3" @act1-complete="handleAct1Complete" />
+      <PhaseThree
+        v-if="currentPhase === 3"
+        @act1-complete="handleAct1Complete"
+        @back-to-planet="handleBackToPlanet"
+      />
     </Transition>
+
+    <!-- 全局浮动音乐播放器 -->
+    <FloatingMusicPlayer />
   </main>
 </template>
 
