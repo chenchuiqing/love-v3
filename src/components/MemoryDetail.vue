@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import * as THREE from 'three'
 import type { Memory } from '@/types/memory'
 import { useMusicPlayerStore } from '@/stores/musicPlayer'
+import { AppleCard, AppleCardCarousel, AppleCarouselItem } from '@/components/ui/apple-card-carousel'
 
 const props = defineProps<{
   memory: Memory
@@ -16,8 +17,6 @@ const containerRef = ref<HTMLElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 
 const displayedText = ref('')
-const isImageLoaded = ref(false)
-const isPortraitImage = ref(false)
 
 const musicPlayer = useMusicPlayerStore()
 
@@ -27,6 +26,61 @@ const isCurrentPlaying = computed(
     musicPlayer.isCurrentTrack(props.memory.content.audioUrl) &&
     musicPlayer.isPlaying
 )
+
+const mediaImages = computed(() => {
+  const urls = props.memory.content.imageUrls
+  if (Array.isArray(urls) && urls.length > 0) {
+    return urls.filter((url): url is string => typeof url === 'string' && url.trim().length > 0).slice(0, 5)
+  }
+
+  if (props.memory.content.imageUrl) {
+    return [props.memory.content.imageUrl]
+  }
+
+  return []
+})
+
+type MediaCardItem = {
+  src: string
+  title: string
+  category: string
+  mediaType: 'image' | 'video' | 'audio'
+  mediaUrl: string
+}
+
+const mediaCards = computed<MediaCardItem[]>(() => {
+  const photoItems = mediaImages.value.map((src, index) => ({
+    src,
+    title: `${props.memory.title} #${index + 1}`,
+    category: '回忆照片',
+    mediaType: 'image' as const,
+    mediaUrl: src,
+  }))
+
+  const cards: MediaCardItem[] = [...photoItems]
+
+  if (props.memory.content.videoUrl) {
+    cards.push({
+      src: props.memory.content.videoUrl,
+      title: `${props.memory.title} · 视频`,
+      category: '回忆视频',
+      mediaType: 'video',
+      mediaUrl: props.memory.content.videoUrl,
+    })
+  }
+
+  if (props.memory.content.audioUrl) {
+    cards.push({
+      src: mediaImages.value[0] ?? 'https://placehold.co/640x900/0f172a/e2e8f0?text=Music',
+      title: `${props.memory.title} · 音乐`,
+      category: '回忆音乐',
+      mediaType: 'audio',
+      mediaUrl: props.memory.content.audioUrl,
+    })
+  }
+
+  return cards
+})
 
 let scene: THREE.Scene
 let camera: THREE.PerspectiveCamera
@@ -197,12 +251,6 @@ const startTypewriter = () => {
   }, 80)
 }
 
-const handleImageLoad = (e: Event) => {
-  const img = e.target as HTMLImageElement
-  isPortraitImage.value = img.naturalHeight > img.naturalWidth
-  isImageLoaded.value = true
-}
-
 const toggleAudio = async () => {
   const url = props.memory.content.audioUrl
   if (!url) return
@@ -210,7 +258,7 @@ const toggleAudio = async () => {
   if (musicPlayer.isCurrentTrack(url)) {
     await musicPlayer.toggle()
   } else {
-    await musicPlayer.play(url, props.memory.title, props.memory.content.imageUrl)
+    await musicPlayer.play(url, props.memory.title, mediaImages.value[0] ?? props.memory.content.imageUrl)
   }
 }
 
@@ -228,8 +276,6 @@ const handleResize = () => {
 
 watch(() => props.memory, () => {
   displayedText.value = ''
-  isImageLoaded.value = false
-  isPortraitImage.value = false
 
   setTimeout(() => {
     startTypewriter()
@@ -272,29 +318,59 @@ onUnmounted(() => {
         {{ memory.title }}
       </h2>
 
-      <div v-if="memory.content.videoUrl" class="video-container">
-        <video
-          class="memory-video"
-          :src="memory.content.videoUrl"
-          :poster="memory.content.imageUrl"
-          controls
-          playsinline
-          preload="metadata"
-        />
-      </div>
-
       <div
-        v-else-if="memory.content.imageUrl"
-        class="image-container"
-        :class="{ 'is-portrait': isPortraitImage }"
+        v-if="mediaCards.length > 0"
+        class="media-layout"
       >
-        <img
-          :src="memory.content.imageUrl"
-          :alt="memory.title"
-          loading="lazy"
-          :class="{ 'is-loaded': isImageLoaded }"
-          @load="handleImageLoad"
-        />
+        <section v-if="mediaCards.length > 0" class="media-card photo-card">
+          <div class="card-head">
+            <span class="card-title">媒体集</span>
+            <span class="card-meta">{{ mediaCards.length }} 张/段</span>
+          </div>
+
+          <AppleCardCarousel :initial-scroll="0" class="photo-carousel-shell">
+            <AppleCarouselItem
+              v-for="(card, index) in mediaCards"
+              :key="`${card.src}-${index}`"
+              :index="index"
+            >
+              <AppleCard
+                :card="card"
+                :index="index"
+                :layout="true"
+              >
+                <img
+                  v-if="card.mediaType === 'image'"
+                  :src="card.src"
+                  :alt="card.title"
+                  class="photo-expanded-image"
+                  loading="lazy"
+                />
+                <video
+                  v-else-if="card.mediaType === 'video'"
+                  class="media-expanded-video"
+                  :src="card.mediaUrl"
+                  :poster="card.src"
+                  controls
+                  playsinline
+                  preload="metadata"
+                />
+                <div v-else class="audio-expanded-card">
+                  <div class="audio-symbol">♫</div>
+                  <p class="audio-title">{{ memory.title }}</p>
+                  <button
+                    class="play-button"
+                    @click.stop="toggleAudio"
+                  >
+                    <span v-if="isCurrentPlaying">⏸</span>
+                    <span v-else>▶</span>
+                    {{ isCurrentPlaying ? '暂停播放' : '播放音乐' }}
+                  </button>
+                </div>
+              </AppleCard>
+            </AppleCarouselItem>
+          </AppleCardCarousel>
+        </section>
       </div>
 
       <p class="memory-text">
@@ -304,17 +380,6 @@ onUnmounted(() => {
       <div v-if="memory.content.location" class="location-tag">
         <span class="location-icon">📍</span>
         {{ memory.content.location }}
-      </div>
-
-      <div v-if="memory.content.audioUrl" class="audio-controls">
-        <button
-          class="play-button"
-          @click="toggleAudio"
-        >
-          <span v-if="isCurrentPlaying">⏸</span>
-          <span v-else>▶</span>
-          {{ isCurrentPlaying ? '暂停' : '播放' }}
-        </button>
       </div>
 
       <button class="back-button" @click="handleClose">
@@ -347,7 +412,7 @@ onUnmounted(() => {
 .content-wrapper {
   position: relative;
   z-index: 10;
-  max-width: 600px;
+  max-width: 760px;
   width: 90%;
   padding: 2rem;
   display: flex;
@@ -370,6 +435,10 @@ onUnmounted(() => {
   .memory-title {
     font-size: 1.5rem;
   }
+
+  .media-card {
+    padding: 0.65rem;
+  }
 }
 
 .date-badge {
@@ -391,73 +460,81 @@ onUnmounted(() => {
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
 
-.image-container {
-  max-width: 400px;
-  margin: 0 auto;
+.media-layout {
+  width: 100%;
+  display: grid;
+  gap: 0.85rem;
+  max-width: 700px;
 }
 
-.video-container {
-  width: 100%;
-  max-width: 400px;
-  margin: 0 auto;
-}
-
-.memory-video {
-  display: block;
-  width: 100%;
-  height: auto;
-  max-height: min(42vh, 320px);
+.media-card {
+  padding: 0.8rem;
   border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(12, 20, 35, 0.5);
+  backdrop-filter: blur(10px);
 }
 
-/* 竖图：固定 4:3 画框，裁掉上下多余部分（absolute 避免 iOS 上 height:100% 失效留白） */
-.image-container.is-portrait {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  overflow: hidden;
-  border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  line-height: 0;
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.65rem;
 }
 
-.image-container.is-portrait img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center;
+.card-title {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.92);
 }
 
-/* 横图 / 方图：容器高度贴合图片，避免移动端容器比图高产生留白 */
-.image-container:not(.is-portrait) {
+.card-meta {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.photo-carousel-shell {
+  margin-top: -0.35rem;
+  margin-bottom: -0.25rem;
+}
+
+.photo-expanded-image {
   display: block;
   width: 100%;
-  line-height: 0;
-}
-
-.image-container:not(.is-portrait) img {
-  display: block;
-  width: 100%;
-  height: auto;
-  max-height: min(42vh, 320px);
+  max-height: min(78vh, 760px);
   object-fit: contain;
   border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.image-container img {
-  opacity: 0;
-  transition: opacity 0.5s ease;
+.media-expanded-video {
+  display: block;
+  width: 100%;
+  max-height: min(78vh, 760px);
+  border-radius: 1rem;
+  background: #020617;
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-.image-container img.is-loaded {
-  opacity: 1;
+.audio-expanded-card {
+  display: grid;
+  gap: 1rem;
+  justify-items: center;
+  align-content: center;
+  min-height: 260px;
+  padding: 1.25rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(8, 15, 28, 0.65);
+}
+
+.audio-symbol {
+  font-size: 2.4rem;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.audio-title {
+  margin: 0;
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .memory-text {
@@ -492,10 +569,6 @@ onUnmounted(() => {
 
 .location-icon {
   font-size: 1rem;
-}
-
-.audio-controls {
-  margin-top: 0.5rem;
 }
 
 .play-button {

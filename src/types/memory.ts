@@ -21,6 +21,7 @@ export interface MemoryPosition {
 export interface MemoryContent {
   text?: string
   imageUrl?: string
+  imageUrls?: string[]
   audioUrl?: string
   videoUrl?: string
   location?: string

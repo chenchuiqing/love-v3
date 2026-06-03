@@ -19,6 +19,7 @@ const particleThemeSchema = z.enum([
 export const memoryContentSchema = z.object({
   text: z.string().min(1).optional(),
   imageUrl: z.string().min(1).optional(),
+  imageUrls: z.array(z.string().min(1)).max(5).optional(),
   audioUrl: z.string().min(1).optional(),
   videoUrl: z.string().min(1).optional(),
   location: z.string().min(1).optional(),

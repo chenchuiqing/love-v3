@@ -24,11 +24,14 @@ interface FormState {
   orbitRadius: number
   text: string
   imageUrl: string
+  imageUrls: string[]
   audioUrl: string
   videoUrl: string
   location: string
   theme: ParticleTheme
 }
+
+const MAX_IMAGE_COUNT = 5
 
 const route = useRoute()
 const router = useRouter()
@@ -66,6 +69,7 @@ const form = reactive<FormState>({
   orbitRadius: 1.08,
   text: '',
   imageUrl: '',
+  imageUrls: [],
   audioUrl: '',
   videoUrl: '',
   location: '',
@@ -86,6 +90,9 @@ const previewDetailMemory = ref<Memory | null>(null)
 const isEditMode = computed(() => typeof route.params.id === 'string' && route.params.id.length > 0)
 const currentId = computed(() => (typeof route.params.id === 'string' ? route.params.id : ''))
 const previewFormMemory = computed<Memory>(() => {
+  const imageUrls = getSanitizedImageUrls()
+  const fallbackImageUrl = form.imageUrl.trim()
+  const resolvedImageUrl = imageUrls[0] ?? fallbackImageUrl
   return {
     id: currentId.value || '__preview_draft__',
     type: form.type,
@@ -99,7 +106,8 @@ const previewFormMemory = computed<Memory>(() => {
     },
     content: {
       text: form.text || undefined,
-      imageUrl: form.imageUrl || undefined,
+      imageUrl: resolvedImageUrl || undefined,
+      imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
       audioUrl: form.audioUrl || undefined,
       videoUrl: form.videoUrl || undefined,
       location: form.location || undefined,
@@ -112,6 +120,11 @@ const previewPlanetMemories = computed<Memory[]>(() => {
   return [...catalogWithoutCurrent, previewFormMemory.value]
 })
 
+const getSanitizedImageUrls = (): string[] => {
+  const urls = form.imageUrls.map((url) => url.trim()).filter((url) => url.length > 0)
+  return urls.slice(0, MAX_IMAGE_COUNT)
+}
+
 const applyMemoryToForm = (memory: Memory) => {
   form.type = memory.type
   form.title = memory.title
@@ -121,7 +134,9 @@ const applyMemoryToForm = (memory: Memory) => {
   form.phi = memory.position.phi
   form.orbitRadius = memory.orbitRadius
   form.text = memory.content.text ?? ''
-  form.imageUrl = memory.content.imageUrl ?? ''
+  const loadedImageUrls = memory.content.imageUrls?.filter((url) => url.trim().length > 0).slice(0, MAX_IMAGE_COUNT) ?? []
+  form.imageUrls = loadedImageUrls.length > 0 ? loadedImageUrls : (memory.content.imageUrl ? [memory.content.imageUrl] : [])
+  form.imageUrl = memory.content.imageUrl ?? loadedImageUrls[0] ?? ''
   form.audioUrl = memory.content.audioUrl ?? ''
   form.videoUrl = memory.content.videoUrl ?? ''
   form.location = memory.content.location ?? ''
@@ -129,6 +144,9 @@ const applyMemoryToForm = (memory: Memory) => {
 }
 
 const buildCreatePayload = (): Omit<Memory, 'id'> => {
+  const imageUrls = getSanitizedImageUrls()
+  const fallbackImageUrl = form.imageUrl.trim()
+  const resolvedImageUrl = imageUrls[0] ?? fallbackImageUrl
   return {
     type: form.type,
     title: form.title,
@@ -141,7 +159,8 @@ const buildCreatePayload = (): Omit<Memory, 'id'> => {
     },
     content: {
       text: form.text || undefined,
-      imageUrl: form.imageUrl || undefined,
+      imageUrl: resolvedImageUrl || undefined,
+      imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
       audioUrl: form.audioUrl || undefined,
       videoUrl: form.videoUrl || undefined,
       location: form.location || undefined,
@@ -151,6 +170,9 @@ const buildCreatePayload = (): Omit<Memory, 'id'> => {
 }
 
 const buildUpdatePayload = (): Omit<Memory, 'id'> => {
+  const imageUrls = getSanitizedImageUrls()
+  const fallbackImageUrl = form.imageUrl.trim()
+  const resolvedImageUrl = imageUrls[0] ?? fallbackImageUrl
   return {
     type: form.type,
     title: form.title,
@@ -163,7 +185,8 @@ const buildUpdatePayload = (): Omit<Memory, 'id'> => {
     },
     content: {
       text: form.text || undefined,
-      imageUrl: form.imageUrl || undefined,
+      imageUrl: resolvedImageUrl || undefined,
+      imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
       audioUrl: form.audioUrl || undefined,
       videoUrl: form.videoUrl || undefined,
       location: form.location || undefined,
@@ -191,26 +214,22 @@ const refillAutoPosition = () => {
   form.orbitRadius = Number((1.05 + Math.random() * 0.1).toFixed(4))
 }
 
-const uploadFile = async (file: File, target: 'image' | 'audio' | 'video') => {
+const uploadFile = async (file: File, target: 'audio' | 'video') => {
   errorMessage.value = ''
   successMessage.value = ''
-  if (target === 'image') {
-    isUploadingImage.value = true
-  } else if (target === 'audio') {
+  if (target === 'audio') {
     isUploadingAudio.value = true
   } else {
     isUploadingVideo.value = true
   }
   try {
     const url = await uploadAdminMedia(file)
-    if (target === 'image') {
-      form.imageUrl = url
-    } else if (target === 'audio') {
+    if (target === 'audio') {
       form.audioUrl = url
     } else {
       form.videoUrl = url
     }
-    const targetLabel = target === 'image' ? '图片' : target === 'audio' ? '音频' : '视频'
+    const targetLabel = target === 'audio' ? '音频' : '视频'
     successMessage.value = `${targetLabel}上传成功，链接已自动填入表单`
   } catch (error) {
     successMessage.value = ''
@@ -220,9 +239,7 @@ const uploadFile = async (file: File, target: 'image' | 'audio' | 'video') => {
       errorMessage.value = '上传失败'
     }
   } finally {
-    if (target === 'image') {
-      isUploadingImage.value = false
-    } else if (target === 'audio') {
+    if (target === 'audio') {
       isUploadingAudio.value = false
     } else {
       isUploadingVideo.value = false
@@ -232,9 +249,50 @@ const uploadFile = async (file: File, target: 'image' | 'audio' | 'video') => {
 
 const handleUploadImage = async (event: Event) => {
   const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
-  await uploadFile(file, 'image')
+  const files = input.files ? Array.from(input.files) : []
+  if (files.length === 0) return
+
+  errorMessage.value = ''
+  successMessage.value = ''
+  const existing = getSanitizedImageUrls()
+  const remain = MAX_IMAGE_COUNT - existing.length
+  if (remain <= 0) {
+    errorMessage.value = `最多只能上传 ${MAX_IMAGE_COUNT} 张图片`
+    input.value = ''
+    return
+  }
+
+  const selected = files.slice(0, remain)
+  isUploadingImage.value = true
+  try {
+    const uploaded: string[] = []
+    for (const file of selected) {
+      const url = await uploadAdminMedia(file)
+      if (!existing.includes(url) && !uploaded.includes(url)) {
+        uploaded.push(url)
+      }
+    }
+    form.imageUrls = [...existing, ...uploaded].slice(0, MAX_IMAGE_COUNT)
+    form.imageUrl = form.imageUrls[0] ?? ''
+    if (uploaded.length > 0) {
+      successMessage.value = `图片上传成功，已新增 ${uploaded.length} 张`
+    } else {
+      successMessage.value = '图片已存在，未新增'
+    }
+    if (files.length > selected.length) {
+      successMessage.value += `（最多保留 ${MAX_IMAGE_COUNT} 张）`
+    }
+  } catch (error) {
+    successMessage.value = ''
+    if (error instanceof Error) {
+      errorMessage.value = error.message
+    } else {
+      errorMessage.value = '图片上传失败'
+    }
+  } finally {
+    isUploadingImage.value = false
+    input.value = ''
+  }
 }
 
 const handleUploadAudio = async (event: Event) => {
@@ -249,6 +307,20 @@ const handleUploadVideo = async (event: Event) => {
   const file = input.files?.[0]
   if (!file) return
   await uploadFile(file, 'video')
+}
+
+const removeImageAt = (index: number) => {
+  if (index < 0 || index >= form.imageUrls.length) return
+  form.imageUrls = form.imageUrls.filter((_, idx) => idx !== index)
+  form.imageUrl = form.imageUrls[0] ?? ''
+}
+
+const clearAudio = () => {
+  form.audioUrl = ''
+}
+
+const clearVideo = () => {
+  form.videoUrl = ''
 }
 
 const handleSubmit = async () => {
@@ -380,8 +452,8 @@ onMounted(async () => {
 
         <div class="upload-row">
           <label class="upload-field">
-            上传图片
-            <input type="file" accept="image/*" @change="handleUploadImage" />
+            上传图片（最多 5 张，可多选）
+            <input type="file" accept="image/*" multiple @change="handleUploadImage" />
           </label>
           <label class="upload-field">
             上传音频
@@ -419,10 +491,24 @@ onMounted(async () => {
           {{ isUploadingAudio ? '音频上传中...' : '' }}
           {{ isUploadingVideo ? '视频上传中...' : '' }}
         </p>
-        <div class="upload-result" v-if="form.imageUrl || form.audioUrl || form.videoUrl">
-          <p class="hint" v-if="form.imageUrl">图片链接：{{ form.imageUrl }}</p>
-          <p class="hint" v-if="form.audioUrl">音频链接：{{ form.audioUrl }}</p>
-          <p class="hint" v-if="form.videoUrl">视频链接：{{ form.videoUrl }}</p>
+        <div class="upload-result" v-if="form.imageUrl || form.audioUrl || form.videoUrl || getSanitizedImageUrls().length > 0">
+          <div v-if="getSanitizedImageUrls().length > 0" class="media-block">
+            <p class="hint">图片（{{ getSanitizedImageUrls().length }} 张）</p>
+            <div class="media-list">
+              <div v-for="(url, index) in getSanitizedImageUrls()" :key="`${url}-${index}`" class="media-item">
+                <span class="hint media-url">{{ url }}</span>
+                <button type="button" class="danger-button" @click="removeImageAt(index)">删除</button>
+              </div>
+            </div>
+          </div>
+          <div v-if="form.audioUrl" class="media-block">
+            <p class="hint">音频链接：{{ form.audioUrl }}</p>
+            <button type="button" class="danger-button" @click="clearAudio">删除音频</button>
+          </div>
+          <div v-if="form.videoUrl" class="media-block">
+            <p class="hint">视频链接：{{ form.videoUrl }}</p>
+            <button type="button" class="danger-button" @click="clearVideo">删除视频</button>
+          </div>
         </div>
 
         <div class="footer">
@@ -597,6 +683,10 @@ button {
   cursor: pointer;
 }
 
+.danger-button {
+  background: #8e2f2f;
+}
+
 button:disabled {
   opacity: 0.7;
   cursor: not-allowed;
@@ -620,11 +710,32 @@ button:disabled {
 
 .upload-result {
   display: grid;
-  gap: 0.25rem;
+  gap: 0.6rem;
 }
 
 .upload-result .hint {
   word-break: break-all;
+}
+
+.media-block {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.media-list {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.media-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.media-url {
+  line-height: 1.3;
 }
 
 .field-label {
