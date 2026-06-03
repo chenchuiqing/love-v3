@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import type { Memory, MemoryType, ParticleTheme } from '@/types/memory'
@@ -15,7 +15,6 @@ import MemoryDetail from '@/components/MemoryDetail.vue'
 import MemoryPlanet from '@/components/MemoryPlanet.vue'
 
 interface FormState {
-  id: string
   type: MemoryType
   title: string
   date: string
@@ -50,7 +49,6 @@ const themeOptions: ParticleTheme[] = [
 ]
 
 const form = reactive<FormState>({
-  id: '',
   type: 'photo',
   title: '',
   date: '',
@@ -78,7 +76,7 @@ const isEditMode = computed(() => typeof route.params.id === 'string' && route.p
 const currentId = computed(() => (typeof route.params.id === 'string' ? route.params.id : ''))
 const previewFormMemory = computed<Memory>(() => {
   return {
-    id: form.id || '__preview_draft__',
+    id: currentId.value || '__preview_draft__',
     type: form.type,
     title: form.title || '未命名记忆点',
     date: form.date || '待填写日期',
@@ -102,16 +100,7 @@ const previewPlanetMemories = computed<Memory[]>(() => {
   return [...catalogWithoutCurrent, previewFormMemory.value]
 })
 
-const normalizeSlug = (value: string): string => {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-}
-
 const applyMemoryToForm = (memory: Memory) => {
-  form.id = memory.id
   form.type = memory.type
   form.title = memory.title
   form.date = memory.date
@@ -126,9 +115,8 @@ const applyMemoryToForm = (memory: Memory) => {
   form.theme = memory.content.theme ?? 'default'
 }
 
-const buildCreatePayload = (): Memory => {
+const buildCreatePayload = (): Omit<Memory, 'id'> => {
   return {
-    id: form.id,
     type: form.type,
     title: form.title,
     date: form.date,
@@ -181,17 +169,6 @@ const loadPreviewCatalog = async () => {
     previewErrorMessage.value = '预览列表加载失败'
   }
 }
-
-watch(
-  () => form.title,
-  (nextTitle) => {
-    if (isEditMode.value || form.id.trim().length > 0) {
-      return
-    }
-    const slug = normalizeSlug(nextTitle)
-    form.id = slug ? `memory-${slug}` : ''
-  },
-)
 
 const refillAutoPosition = () => {
   form.theta = Number((Math.random() * Math.PI * 2).toFixed(4))
@@ -246,8 +223,8 @@ const handleUploadAudio = async (event: Event) => {
 
 const handleSubmit = async () => {
   errorMessage.value = ''
-  if (!form.title || !form.date || !form.id) {
-    errorMessage.value = '请先填写 ID、标题、日期'
+  if (!form.title || !form.date) {
+    errorMessage.value = '请先填写标题和日期'
     return
   }
 
@@ -261,7 +238,7 @@ const handleSubmit = async () => {
     await router.push({ name: 'AdminMemoryList' })
   } catch (error) {
     if (error instanceof ApiError && error.status === 409) {
-      errorMessage.value = 'ID 已存在，请更换'
+      errorMessage.value = '保存失败，请稍后重试'
       return
     }
     if (error instanceof Error) {
@@ -309,11 +286,6 @@ onMounted(async () => {
     <p v-if="loading" class="hint">加载中...</p>
     <div v-else class="layout">
       <form class="form" @submit.prevent="handleSubmit">
-        <label>
-          ID
-          <input v-model.trim="form.id" :disabled="isEditMode" />
-        </label>
-
         <label>
           标题
           <input v-model.trim="form.title" />
@@ -406,7 +378,13 @@ onMounted(async () => {
         <div class="footer">
           <RouterLink :to="{ name: 'AdminMemoryList' }">取消</RouterLink>
           <button type="submit" :disabled="submitting">
-            {{ submitting ? '保存中...' : '保存' }}
+            {{
+              submitting
+                ? '保存中...'
+                : isEditMode
+                  ? '保存修改'
+                  : '确定新增'
+            }}
           </button>
         </div>
       </form>

@@ -17,6 +17,7 @@
     "lint:fix": "eslint . --fix && prettier --write ."
   },
   "dependencies": {
+    "@sapphire/snowflake": "^3.5.5",
     "@tailwindcss/vite": "^4.1.11",
     "@vueuse/core": "^13.6.0",
     "fireworks-js": "^2.10.8",

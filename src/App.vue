@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { RouterView, useRoute } from 'vue-router'
 import PhaseOne from './components/PhaseOne.vue';
 import PhaseTwo from './components/PhaseTwo.vue';
@@ -73,12 +73,42 @@ const syncFullscreenState = () => {
   isFullscreen.value = !!document.fullscreenElement;
 };
 
+const applyScrollModeByRoute = (adminMode: boolean) => {
+  const appRoot = document.getElementById('app')
+  if (!appRoot) return
+
+  if (adminMode) {
+    document.documentElement.style.overflow = 'auto'
+    document.body.style.overflow = 'auto'
+    appRoot.style.height = 'auto'
+    appRoot.style.minHeight = '100%'
+    return
+  }
+
+  document.documentElement.style.overflow = 'hidden'
+  document.body.style.overflow = 'hidden'
+  appRoot.style.height = '100%'
+  appRoot.style.minHeight = ''
+}
+
 onMounted(() => {
   document.addEventListener('fullscreenchange', syncFullscreenState);
+  applyScrollModeByRoute(isAdminRoute.value)
 });
+
+watch(isAdminRoute, (nextValue) => {
+  applyScrollModeByRoute(nextValue)
+})
 
 onUnmounted(() => {
   document.removeEventListener('fullscreenchange', syncFullscreenState);
+  document.documentElement.style.overflow = ''
+  document.body.style.overflow = ''
+  const appRoot = document.getElementById('app')
+  if (appRoot) {
+    appRoot.style.height = ''
+    appRoot.style.minHeight = ''
+  }
 });
 </script>
 

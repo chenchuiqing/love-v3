@@ -10,6 +10,8 @@ interface MemoryResponse {
   data: Memory
 }
 
+type CreateAdminMemoryInput = Omit<Memory, 'id'>
+
 interface UploadResponse {
   data: {
     url: string
@@ -34,7 +36,7 @@ export const fetchAdminMemoryById = async (id: string): Promise<Memory> => {
   return result.data
 }
 
-export const createAdminMemory = async (memory: Memory): Promise<Memory> => {
+export const createAdminMemory = async (memory: CreateAdminMemoryInput): Promise<Memory> => {
   const result = await apiRequest<MemoryResponse>('/api/admin/memories', {
     method: 'POST',
     body: JSON.stringify(memory),

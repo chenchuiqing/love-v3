@@ -40,7 +40,7 @@ export const memorySchema = z.object({
 })
 
 export const createMemoryInputSchema = z.object({
-  id: z.string().min(1),
+  id: z.string().min(1).optional(),
   type: memoryTypeSchema,
   title: z.string().min(1),
   date: z.string().min(1),

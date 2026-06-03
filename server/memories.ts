@@ -5,6 +5,7 @@ import {
   generateDistributedPoint,
   type SphericalPoint,
 } from './spherical'
+import { generateSnowflakeId } from './snowflake'
 import type { CreateMemoryInput, MemoryDto, UpdateMemoryInput } from './types'
 
 interface MemoryRow {
@@ -97,7 +98,12 @@ const getCurrentCount = (): number => {
 }
 
 export const createMemory = (input: CreateMemoryInput): MemoryDto => {
-  if (getMemoryById(input.id)) {
+  let id = input.id ?? generateSnowflakeId()
+  if (!input.id) {
+    while (getMemoryById(id)) {
+      id = generateSnowflakeId()
+    }
+  } else if (getMemoryById(id)) {
     throw new Error('ID 已存在')
   }
 
@@ -109,7 +115,7 @@ export const createMemory = (input: CreateMemoryInput): MemoryDto => {
   const orbitRadius = input.orbitRadius ?? defaultOrbitRadius(count)
 
   createStmt.run(
-    input.id,
+    id,
     input.type,
     input.title,
     input.date,
@@ -121,7 +127,7 @@ export const createMemory = (input: CreateMemoryInput): MemoryDto => {
     input.sortOrder ?? null,
   )
 
-  return getMemoryById(input.id) as MemoryDto
+  return getMemoryById(id) as MemoryDto
 }
 
 export const updateMemory = (id: string, input: UpdateMemoryInput): MemoryDto | null => {
