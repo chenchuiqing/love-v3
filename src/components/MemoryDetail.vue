@@ -328,11 +328,16 @@ onUnmounted(() => {
             <span class="card-meta">{{ mediaCards.length }} 张/段</span>
           </div>
 
-          <AppleCardCarousel :initial-scroll="0" class="photo-carousel-shell">
+          <AppleCardCarousel
+            :initial-scroll="0"
+            :item-count="mediaCards.length"
+            class="photo-carousel-shell"
+          >
             <AppleCarouselItem
               v-for="(card, index) in mediaCards"
               :key="`${card.src}-${index}`"
               :index="index"
+              :trailing-space="mediaCards.length > 2"
             >
               <AppleCard
                 :card="card"
@@ -473,6 +478,12 @@ onUnmounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(12, 20, 35, 0.5);
   backdrop-filter: blur(10px);
+}
+
+.photo-card {
+  width: min(100%, 36rem);
+  justify-self: center;
+  overflow: hidden;
 }
 
 .card-head {

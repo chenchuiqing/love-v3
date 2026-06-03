@@ -3,9 +3,12 @@ import { Motion } from "motion-v";
 
 interface Props {
   index: number;
+  trailingSpace?: boolean;
 }
 
-defineProps<Props>();
+withDefaults(defineProps<Props>(), {
+  trailingSpace: true,
+});
 </script>
 
 <template>
@@ -24,7 +27,8 @@ defineProps<Props>();
         ease: 'easeOut',
       },
     }"
-    class="rounded-3xl last:pr-[5%] md:last:pr-[10%]"
+    class="apple-carousel-item shrink-0 rounded-3xl"
+    :class="trailingSpace ? 'last:pr-[5%] md:last:pr-[10%]' : ''"
   >
     <slot />
   </Motion>

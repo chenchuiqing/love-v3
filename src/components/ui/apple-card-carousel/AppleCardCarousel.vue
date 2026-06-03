@@ -5,10 +5,12 @@ import { CarouselKey } from "./AppleCarouselContext";
 
 interface Props {
   initialScroll?: number;
+  itemCount?: number;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   initialScroll: 0,
+  itemCount: 0,
 });
 
 const carouselRef = ref<HTMLDivElement | null>(null);
@@ -37,19 +39,33 @@ function checkScrollability() {
   if (carouselRef.value) {
     const { scrollLeft, scrollWidth, clientWidth } = carouselRef.value;
     canScrollLeft.value = scrollLeft > 0;
-    canScrollRight.value = scrollLeft < scrollWidth - clientWidth;
+    canScrollRight.value = scrollLeft < scrollWidth - clientWidth - 1;
   }
+}
+
+function getScrollStep() {
+  const firstItem = carouselRef.value?.querySelector<HTMLElement>(".apple-carousel-item");
+  if (!firstItem) {
+    return isMobile.value ? 188 : 268;
+  }
+
+  const nextItem = firstItem.nextElementSibling as HTMLElement | null;
+  if (!nextItem) {
+    return firstItem.getBoundingClientRect().width;
+  }
+
+  return nextItem.offsetLeft - firstItem.offsetLeft;
 }
 
 function scrollLeft() {
   if (carouselRef.value) {
-    carouselRef.value.scrollBy({ left: -240, behavior: "smooth" });
+    carouselRef.value.scrollBy({ left: -getScrollStep(), behavior: "smooth" });
   }
 }
 
 function scrollRight() {
   if (carouselRef.value) {
-    carouselRef.value.scrollBy({ left: 240, behavior: "smooth" });
+    carouselRef.value.scrollBy({ left: getScrollStep(), behavior: "smooth" });
   }
 }
 
@@ -70,6 +86,8 @@ const isMobile = computed(() => {
   return window && window.innerWidth < 768;
 });
 
+const shouldCenterItems = computed(() => props.itemCount > 0 && props.itemCount <= 2);
+
 provide(CarouselKey, {
   onCardClose: handleCardClose,
   currentIndex,
@@ -77,15 +95,18 @@ provide(CarouselKey, {
 </script>
 
 <template>
-  <div class="relative w-full">
+  <div class="relative w-full min-w-0 overflow-hidden">
     <div
       ref="carouselRef"
-      class="flex w-full overflow-x-scroll overscroll-x-auto scroll-smooth py-3 [scrollbar-width:none] md:py-6"
+      class="flex w-full min-w-0 overflow-x-auto overscroll-x-auto scroll-smooth py-3 [scrollbar-width:none] md:py-6"
       @scroll="checkScrollability"
     >
-      <div class="absolute right-0 z-1000 h-auto w-[5%] overflow-hidden bg-linear-to-l" />
+      <div class="pointer-events-none absolute right-0 z-1000 h-full w-[5%] overflow-hidden bg-linear-to-l" />
 
-      <div class="mx-auto flex max-w-7xl flex-row justify-start gap-3 pl-3">
+      <div
+        class="flex min-w-full flex-row gap-3 px-3"
+        :class="shouldCenterItems ? 'justify-start md:justify-center' : 'justify-start'"
+      >
         <slot />
       </div>
     </div>
