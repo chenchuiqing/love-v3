@@ -44,7 +44,7 @@ type MediaCardItem = {
   src: string
   title: string
   category: string
-  mediaType: 'image' | 'video' | 'audio'
+  mediaType: 'image' | 'video'
   mediaUrl: string
 }
 
@@ -66,16 +66,6 @@ const mediaCards = computed<MediaCardItem[]>(() => {
       category: '回忆视频',
       mediaType: 'video',
       mediaUrl: props.memory.content.videoUrl,
-    })
-  }
-
-  if (props.memory.content.audioUrl) {
-    cards.push({
-      src: mediaImages.value[0] ?? 'https://placehold.co/640x900/0f172a/e2e8f0?text=Music',
-      title: `${props.memory.title} · 音乐`,
-      category: '回忆音乐',
-      mediaType: 'audio',
-      mediaUrl: props.memory.content.audioUrl,
     })
   }
 
@@ -352,7 +342,7 @@ onUnmounted(() => {
                   loading="lazy"
                 />
                 <video
-                  v-else-if="card.mediaType === 'video'"
+                  v-else
                   class="media-expanded-video"
                   :src="card.mediaUrl"
                   :poster="card.src"
@@ -360,18 +350,6 @@ onUnmounted(() => {
                   playsinline
                   preload="metadata"
                 />
-                <div v-else class="audio-expanded-card">
-                  <div class="audio-symbol">♫</div>
-                  <p class="audio-title">{{ memory.title }}</p>
-                  <button
-                    class="play-button"
-                    @click.stop="toggleAudio"
-                  >
-                    <span v-if="isCurrentPlaying">⏸</span>
-                    <span v-else>▶</span>
-                    {{ isCurrentPlaying ? '暂停播放' : '播放音乐' }}
-                  </button>
-                </div>
               </AppleCard>
             </AppleCarouselItem>
           </AppleCardCarousel>
@@ -385,6 +363,17 @@ onUnmounted(() => {
       <div v-if="memory.content.location" class="location-tag">
         <span class="location-icon">📍</span>
         {{ memory.content.location }}
+      </div>
+
+      <div v-if="memory.content.audioUrl" class="audio-controls">
+        <button
+          class="play-button"
+          @click="toggleAudio"
+        >
+          <span v-if="isCurrentPlaying">⏸</span>
+          <span v-else>▶</span>
+          {{ isCurrentPlaying ? '暂停' : '播放' }}
+        </button>
       </div>
 
       <button class="back-button" @click="handleClose">
@@ -537,29 +526,6 @@ onUnmounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-.audio-expanded-card {
-  display: grid;
-  gap: 1rem;
-  justify-items: center;
-  align-content: center;
-  min-height: 260px;
-  padding: 1.25rem;
-  border-radius: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(8, 15, 28, 0.65);
-}
-
-.audio-symbol {
-  font-size: 2.4rem;
-  color: rgba(255, 255, 255, 0.92);
-}
-
-.audio-title {
-  margin: 0;
-  font-size: 1rem;
-  color: rgba(255, 255, 255, 0.85);
-}
-
 .memory-text {
   font-size: 1.125rem;
   line-height: 1.8;
@@ -592,6 +558,10 @@ onUnmounted(() => {
 
 .location-icon {
   font-size: 1rem;
+}
+
+.audio-controls {
+  margin-top: 0.5rem;
 }
 
 .play-button {

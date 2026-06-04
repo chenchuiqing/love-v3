@@ -12,9 +12,11 @@ export default defineConfig({
     },
   },
   server: {
+    host: '127.0.0.1',
+    port: 5213,
     proxy: {
-      '/api': 'http://localhost:3000',
-      '/uploads': 'http://localhost:3000',
+      '/api': 'http://127.0.0.1:3000',
+      '/uploads': 'http://127.0.0.1:3000',
     }
   }
 })

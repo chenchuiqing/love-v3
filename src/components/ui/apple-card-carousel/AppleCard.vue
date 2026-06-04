@@ -9,7 +9,7 @@ interface Card {
   src: string;
   title: string;
   category: string;
-  mediaType?: "image" | "video" | "audio";
+  mediaType?: "image" | "video";
 }
 
 interface Props {
