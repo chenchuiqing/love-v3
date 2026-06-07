@@ -369,6 +369,7 @@ onMounted(async () => {
   await loadPreviewCatalog()
 
   if (!isEditMode.value) {
+    refillAutoPosition()
     return
   }
   loading.value = true
