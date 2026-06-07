@@ -146,7 +146,7 @@ const waveBars = [0, 1, 2, 3, 4]
               <path d="M8 5v14l11-7z" />
             </svg>
           </button>
-          <button class="ctrl-button collapse" aria-label="收起播放器" @click="handleCollapse">
+          <button class="ctrl-button btn-collapse" aria-label="收起播放器" @click="handleCollapse">
             <svg viewBox="0 0 24 24" class="icon">
               <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
