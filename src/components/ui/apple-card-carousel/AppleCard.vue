@@ -16,10 +16,12 @@ interface Props {
   card: Card;
   index: number;
   layout?: boolean;
+  hidePreviewText?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   layout: false,
+  hidePreviewText: false,
 });
 
 const open = ref(false);
@@ -125,23 +127,25 @@ function handleClose() {
     class="relative z-10 flex h-64 w-44 flex-col items-start justify-start overflow-hidden rounded-3xl bg-gray-100 md:h-[24rem] md:w-[16rem] dark:bg-neutral-900"
     @click="handleOpen"
   >
-    <div
-      class="pointer-events-none absolute inset-x-0 top-0 z-30 h-full bg-linear-to-b from-black/50 via-transparent to-transparent"
-    />
-    <div class="relative z-40 p-8">
-      <Motion
-        :layout-id="layout ? `category-${card.category}` : undefined"
-        class="text-left font-sans text-sm font-medium text-white md:text-base"
-      >
-        {{ card.category }}
-      </Motion>
-      <Motion
-        :layout-id="layout ? `title-${card.title}` : undefined"
-        class="mt-2 max-w-xs text-left font-sans text-xl font-semibold text-balance text-white md:text-3xl"
-      >
-        {{ card.title }}
-      </Motion>
-    </div>
+    <template v-if="!hidePreviewText">
+      <div
+        class="pointer-events-none absolute inset-x-0 top-0 z-30 h-full bg-linear-to-b from-black/50 via-transparent to-transparent"
+      />
+      <div class="relative z-40 p-8">
+        <Motion
+          :layout-id="layout ? `category-${card.category}` : undefined"
+          class="text-left font-sans text-sm font-medium text-white md:text-base"
+        >
+          {{ card.category }}
+        </Motion>
+        <Motion
+          :layout-id="layout ? `title-${card.title}` : undefined"
+          class="mt-2 max-w-xs text-left font-sans text-xl font-semibold text-balance text-white md:text-3xl"
+        >
+          {{ card.title }}
+        </Motion>
+      </div>
+    </template>
     <video
       v-if="card.mediaType === 'video'"
       :src="card.src"

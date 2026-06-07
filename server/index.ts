@@ -43,7 +43,9 @@ app.get('*', serveStatic({ root: './dist', path: 'index.html' }))
 
 const server = Bun.serve({
   port: env.PORT,
+  hostname: '0.0.0.0',
   fetch: app.fetch,
 })
 
 console.log(`Server is running at http://localhost:${server.port}`)
+console.log(`LAN access: http://0.0.0.0:${server.port}`)

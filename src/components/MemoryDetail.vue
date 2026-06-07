@@ -17,6 +17,8 @@ const containerRef = ref<HTMLElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 
 const displayedText = ref('')
+const isImageLoaded = ref(false)
+const isPortraitImage = ref(false)
 
 const musicPlayer = useMusicPlayerStore()
 
@@ -71,6 +73,8 @@ const mediaCards = computed<MediaCardItem[]>(() => {
 
   return cards
 })
+
+const shouldUseSingleImageLayout = computed(() => mediaImages.value.length === 1 && !props.memory.content.videoUrl)
 
 let scene: THREE.Scene
 let camera: THREE.PerspectiveCamera
@@ -241,6 +245,12 @@ const startTypewriter = () => {
   }, 80)
 }
 
+const handleImageLoad = (e: Event) => {
+  const img = e.target as HTMLImageElement
+  isPortraitImage.value = img.naturalHeight > img.naturalWidth
+  isImageLoaded.value = true
+}
+
 const toggleAudio = async () => {
   const url = props.memory.content.audioUrl
   if (!url) return
@@ -266,6 +276,8 @@ const handleResize = () => {
 
 watch(() => props.memory, () => {
   displayedText.value = ''
+  isImageLoaded.value = false
+  isPortraitImage.value = false
 
   setTimeout(() => {
     startTypewriter()
@@ -309,7 +321,21 @@ onUnmounted(() => {
       </h2>
 
       <div
-        v-if="mediaCards.length > 0"
+        v-if="shouldUseSingleImageLayout"
+        class="image-container"
+        :class="{ 'is-portrait': isPortraitImage }"
+      >
+        <img
+          :src="mediaImages[0]"
+          :alt="memory.title"
+          loading="lazy"
+          :class="{ 'is-loaded': isImageLoaded }"
+          @load="handleImageLoad"
+        />
+      </div>
+
+      <div
+        v-else-if="mediaCards.length > 0"
         class="media-layout"
       >
         <section v-if="mediaCards.length > 0" class="media-card photo-card">
@@ -333,6 +359,7 @@ onUnmounted(() => {
                 :card="card"
                 :index="index"
                 :layout="true"
+                :hide-preview-text="true"
               >
                 <img
                   v-if="card.mediaType === 'image'"
@@ -464,6 +491,57 @@ onUnmounted(() => {
   color: white;
   margin: 0;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.image-container {
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.image-container.is-portrait {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  line-height: 0;
+}
+
+.image-container.is-portrait img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.image-container:not(.is-portrait) {
+  display: block;
+  width: 100%;
+  line-height: 0;
+}
+
+.image-container:not(.is-portrait) img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: min(42vh, 320px);
+  object-fit: contain;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.image-container img {
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.image-container img.is-loaded {
+  opacity: 1;
 }
 
 .media-layout {
