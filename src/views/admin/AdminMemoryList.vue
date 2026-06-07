@@ -78,18 +78,18 @@ onMounted(() => {
       </thead>
       <tbody>
         <tr v-for="item in memories" :key="item.id">
-          <td>{{ item.title }}</td>
-          <td>{{ item.date }}</td>
-          <td>{{ item.type }}</td>
-          <td>
+          <td data-label="标题">{{ item.title }}</td>
+          <td data-label="日期">{{ item.date }}</td>
+          <td data-label="类型">{{ item.type }}</td>
+          <td data-label="颜色">
             <span class="color-dot" :style="{ backgroundColor: item.color }"></span>
-            {{ item.color }}
+            <span class="color-value">{{ item.color }}</span>
           </td>
-          <td>
+          <td data-label="坐标" class="coord-cell">
             θ {{ item.position.theta.toFixed(2) }} / φ {{ item.position.phi.toFixed(2) }} /
             r {{ item.orbitRadius.toFixed(2) }}
           </td>
-          <td class="actions">
+          <td data-label="操作" class="actions-cell">
             <a :href="`/?memory=${item.id}`" target="_blank" rel="noreferrer">预览</a>
             <RouterLink :to="{ name: 'AdminMemoryEdit', params: { id: item.id } }">编辑</RouterLink>
             <button
@@ -164,14 +164,13 @@ thead th {
   vertical-align: middle;
 }
 
-.actions {
+.actions-cell {
   display: flex;
   align-items: center;
   gap: 0.6rem;
 }
 
-.actions a,
-.actions :deep(a) {
+.actions-cell a {
   color: #304f9f;
   text-decoration: none;
 }
@@ -189,5 +188,67 @@ thead th {
 .hint {
   color: #63708c;
   margin: 0;
+}
+
+@media (max-width: 768px) {
+  .table thead {
+    display: none;
+  }
+
+  .table,
+  .table tbody,
+  .table tr,
+  .table td {
+    display: block;
+  }
+
+  .table tr {
+    margin-bottom: 0.75rem;
+    border: 1px solid #d4dbeb;
+    border-radius: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    background: #fff;
+  }
+
+  .table td {
+    border: none;
+    padding: 0.3rem 0;
+    font-size: 0.88rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #5a6377;
+    flex-shrink: 0;
+    min-width: 3.2em;
+  }
+
+  .coord-cell {
+    display: none !important;
+  }
+
+  .color-value {
+    display: none;
+  }
+
+  .actions-cell {
+    padding-top: 0.5rem !important;
+    border-top: 1px solid #ecf0f8 !important;
+    margin-top: 0.3rem;
+  }
+
+  .actions-cell::before {
+    display: none;
+  }
+
+  .actions-cell a,
+  .actions-cell button {
+    font-size: 0.85rem;
+    padding: 0.3rem 0.5rem;
+  }
 }
 </style>

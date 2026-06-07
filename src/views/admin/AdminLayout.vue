@@ -92,4 +92,28 @@ const handleLogout = async () => {
   margin: 0 auto;
   padding: 1.2rem;
 }
+
+@media (max-width: 768px) {
+  .admin-header {
+    flex-wrap: wrap;
+    padding: 0.75rem 1rem;
+  }
+
+  .actions {
+    gap: 0.5rem;
+  }
+
+  .link {
+    font-size: 0.88rem;
+  }
+
+  .logout {
+    font-size: 0.85rem;
+    padding: 0.35rem 0.6rem;
+  }
+
+  .admin-main {
+    padding: 0.75rem;
+  }
+}
 </style>
