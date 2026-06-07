@@ -71,9 +71,8 @@ function scrollRight() {
 
 function handleCardClose(index: number) {
   if (carouselRef.value) {
-    const cardWidth = isMobile.value ? 230 : 384; // (md:w-96)
-    const gap = isMobile.value ? 4 : 8;
-    const scrollPosition = (cardWidth + gap) * (index + 1);
+    const step = getScrollStep();
+    const scrollPosition = step * (index + 1);
     carouselRef.value.scrollTo({
       left: scrollPosition,
       behavior: "smooth",
