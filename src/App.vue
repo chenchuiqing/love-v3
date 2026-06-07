@@ -14,6 +14,7 @@ const phaseTwoResume = ref(false);
 const visitedMemoryIds = ref(new Set<string>());
 const isTransitioning = ref(false);
 const isFullscreen = ref(false);
+const isFullscreenSupported = ref(false);
 const appRef = ref<HTMLElement | null>(null);
 
 const handlePhaseOneComplete = () => {
@@ -56,13 +57,33 @@ const handleAct1Complete = () => {
   console.info('阶段三第一幕已完成，待接入第二幕');
 };
 
+interface FullscreenElement {
+  requestFullscreen?: () => Promise<void>;
+  webkitRequestFullscreen?: () => Promise<void>;
+}
+
+interface FullscreenDocument {
+  fullscreenElement?: Element | null;
+  webkitFullscreenElement?: Element | null;
+  webkitIsFullScreen?: boolean;
+  exitFullscreen?: () => Promise<void>;
+  webkitExitFullscreen?: () => Promise<void>;
+}
+
 const toggleFullscreen = async () => {
   if (!appRef.value) return;
   try {
-    if (document.fullscreenElement) {
-      await document.exitFullscreen();
+    const el = appRef.value as HTMLElement & FullscreenElement;
+    const doc = document as Document & FullscreenDocument;
+
+    const isFull = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.webkitIsFullScreen);
+
+    if (isFull) {
+      if (doc.exitFullscreen) await doc.exitFullscreen();
+      else if (doc.webkitExitFullscreen) await doc.webkitExitFullscreen();
     } else {
-      await appRef.value.requestFullscreen();
+      if (el.requestFullscreen) await el.requestFullscreen();
+      else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
     }
   } catch (error) {
     console.warn('全屏切换失败', error);
@@ -70,7 +91,8 @@ const toggleFullscreen = async () => {
 };
 
 const syncFullscreenState = () => {
-  isFullscreen.value = !!document.fullscreenElement;
+  const doc = document as Document & FullscreenDocument;
+  isFullscreen.value = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.webkitIsFullScreen);
 };
 
 const applyScrollModeByRoute = (adminMode: boolean) => {
@@ -92,7 +114,12 @@ const applyScrollModeByRoute = (adminMode: boolean) => {
 }
 
 onMounted(() => {
+  const el = document.documentElement as HTMLElement & FullscreenElement;
+  isFullscreenSupported.value = !!(el.requestFullscreen || el.webkitRequestFullscreen);
+
   document.addEventListener('fullscreenchange', syncFullscreenState);
+  document.addEventListener('webkitfullscreenchange', syncFullscreenState);
+  syncFullscreenState();
   applyScrollModeByRoute(isAdminRoute.value)
 });
 
@@ -102,6 +129,7 @@ watch(isAdminRoute, (nextValue) => {
 
 onUnmounted(() => {
   document.removeEventListener('fullscreenchange', syncFullscreenState);
+  document.removeEventListener('webkitfullscreenchange', syncFullscreenState);
   document.documentElement.style.overflow = ''
   document.body.style.overflow = ''
   const appRoot = document.getElementById('app')
@@ -116,8 +144,8 @@ onUnmounted(() => {
   <RouterView v-if="isAdminRoute" />
 
   <main v-else ref="appRef" class="app-root">
-    <!-- 全局全屏按钮 -->
-    <button class="fullscreen-button" @click="toggleFullscreen">
+    <!-- 全局全屏按钮（iOS 不支持 Fullscreen API 时自动隐藏） -->
+    <button v-if="isFullscreenSupported" class="fullscreen-button" @click="toggleFullscreen">
       {{ isFullscreen ? '退出全屏' : '进入全屏' }}
     </button>
 
