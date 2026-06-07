@@ -9,12 +9,34 @@ const memories = ref<Memory[]>([])
 const loading = ref(false)
 const errorMessage = ref('')
 const deletingId = ref('')
+const sortOrder = ref<'asc' | 'desc'>('asc')
+
+const toDateNum = (s: string) => {
+  const m = s.match(/^(\d{4})[.\u5e74]\s*(\d{1,2})[.\u6708]\s*(\d{1,2})\u65e5/)
+  return m ? `${m[1]}${m[2].padStart(2, '0')}${m[3].padStart(2, '0')}` : s
+}
+
+const sortMemories = (data: Memory[]) => {
+  const sorted = data.sort((a, b) => {
+    const da = toDateNum(a.date)
+    const db = toDateNum(b.date)
+    return da.localeCompare(db)
+  })
+  if (sortOrder.value === 'desc') sorted.reverse()
+  return sorted
+}
+
+const toggleSort = () => {
+  sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+  memories.value = sortMemories(memories.value)
+}
 
 const loadMemories = async () => {
   loading.value = true
   errorMessage.value = ''
   try {
-    memories.value = await fetchAdminMemories()
+    const data = await fetchAdminMemories()
+    memories.value = sortMemories(data)
   } catch (error) {
     if (error instanceof Error) {
       errorMessage.value = error.message
@@ -69,7 +91,9 @@ onMounted(() => {
       <thead>
         <tr>
           <th>标题</th>
-          <th>日期</th>
+          <th class="th-date" @click="toggleSort">
+            日期 {{ sortOrder === 'asc' ? '↑' : '↓' }}
+          </th>
           <th>类型</th>
           <th>颜色</th>
           <th>坐标</th>
@@ -152,6 +176,15 @@ td {
 
 thead th {
   background: #f8faff;
+}
+
+.th-date {
+  cursor: pointer;
+  user-select: none;
+}
+
+.th-date:hover {
+  background: #eef3fe;
 }
 
 .color-dot {
