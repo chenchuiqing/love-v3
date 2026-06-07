@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { deleteCookie, getSignedCookie, setSignedCookie } from 'hono/cookie'
 import type { Context, MiddlewareHandler } from 'hono'
 
-import { env, isProduction } from './config'
+import { env } from './config'
 
 const SESSION_COOKIE_PATH = '/'
 
@@ -14,6 +14,10 @@ export interface AdminSession {
 
 export interface AppVariables {
   adminSession: AdminSession
+}
+
+const isSecure = (c: Context): boolean => {
+  return c.req.url.startsWith('https://') || c.req.header('x-forwarded-proto') === 'https'
 }
 
 const encodeSession = (session: AdminSession): string => {
@@ -61,7 +65,7 @@ export const createAdminSession = async (c: Context): Promise<void> => {
   await setSignedCookie(c, env.SESSION_COOKIE_NAME, encodeSession(session), env.SESSION_SECRET, {
     path: SESSION_COOKIE_PATH,
     httpOnly: true,
-    secure: isProduction,
+    secure: isSecure(c),
     sameSite: 'Lax',
     maxAge: env.SESSION_MAX_AGE_SECONDS,
   })
@@ -70,7 +74,7 @@ export const createAdminSession = async (c: Context): Promise<void> => {
 export const clearAdminSession = (c: Context): void => {
   deleteCookie(c, env.SESSION_COOKIE_NAME, {
     path: SESSION_COOKIE_PATH,
-    secure: isProduction,
+    secure: isSecure(c),
     sameSite: 'Lax',
     httpOnly: true,
   })
