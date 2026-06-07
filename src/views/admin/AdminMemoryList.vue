@@ -10,10 +10,25 @@ const loading = ref(false)
 const errorMessage = ref('')
 const deletingId = ref('')
 const sortOrder = ref<'asc' | 'desc'>('asc')
+const confirmVisible = ref(false)
+const confirmTarget = ref<{ id: string; title: string } | null>(null)
+
+const openConfirm = (id: string, title: string) => {
+  confirmTarget.value = { id, title }
+  confirmVisible.value = true
+}
+
+const cancelDelete = () => {
+  confirmVisible.value = false
+  confirmTarget.value = null
+}
 
 const toDateNum = (s: string) => {
-  const m = s.match(/^(\d{4})[.\u5e74]\s*(\d{1,2})[.\u6708]\s*(\d{1,2})\u65e5/)
-  return m ? `${m[1]}${m[2].padStart(2, '0')}${m[3].padStart(2, '0')}` : s
+  const cn = s.match(/^(\d{4})年\s*(\d{1,2})月\s*(\d{1,2})日/)
+  if (cn) return `${cn[1]}${cn[2].padStart(2, '0')}${cn[3].padStart(2, '0')}`
+  const dot = s.match(/^(\d{4})\.(\d{1,2})\.(\d{1,2})/)
+  if (dot) return `${dot[1]}${dot[2].padStart(2, '0')}${dot[3].padStart(2, '0')}`
+  return s
 }
 
 const sortMemories = (data: Memory[]) => {
@@ -48,12 +63,13 @@ const loadMemories = async () => {
   }
 }
 
-const handleDelete = async (id: string, title: string) => {
-  const ok = window.confirm(`确认删除「${title}」吗？`)
-  if (!ok) return
+const handleDelete = async () => {
+  if (!confirmTarget.value) return
+  const { id } = confirmTarget.value
 
   deletingId.value = id
   errorMessage.value = ''
+  confirmVisible.value = false
   try {
     await deleteAdminMemory(id)
     memories.value = memories.value.filter((item) => item.id !== id)
@@ -69,6 +85,7 @@ const handleDelete = async (id: string, title: string) => {
     errorMessage.value = '删除失败'
   } finally {
     deletingId.value = ''
+    confirmTarget.value = null
   }
 }
 
@@ -82,6 +99,9 @@ onMounted(() => {
     <div class="toolbar">
       <RouterLink class="primary" :to="{ name: 'AdminMemoryCreate' }">新增记忆点</RouterLink>
       <button type="button" @click="loadMemories">刷新</button>
+      <button type="button" class="sort-mobile" @click="toggleSort">
+        {{ sortOrder === 'asc' ? '↑ 升序' : '↓ 降序' }}
+      </button>
     </div>
 
     <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
@@ -120,7 +140,7 @@ onMounted(() => {
               type="button"
               class="danger"
               :disabled="deletingId === item.id"
-              @click="handleDelete(item.id, item.title)"
+              @click="openConfirm(item.id, item.title)"
             >
               {{ deletingId === item.id ? '删除中...' : '删除' }}
             </button>
@@ -128,6 +148,18 @@ onMounted(() => {
         </tr>
       </tbody>
     </table>
+
+    <Teleport to="body">
+      <div v-if="confirmVisible" class="overlay" @click.self="cancelDelete">
+        <div class="dialog">
+          <p class="dialog-msg">确认删除「{{ confirmTarget?.title }}」吗？</p>
+          <div class="dialog-actions">
+            <button type="button" @click="cancelDelete">取消</button>
+            <button type="button" class="danger" @click="handleDelete">删除</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </section>
 </template>
 
@@ -223,7 +255,49 @@ thead th {
   margin: 0;
 }
 
+.sort-mobile {
+  display: none;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.dialog {
+  background: #fff;
+  border-radius: 0.6rem;
+  padding: 1.5rem;
+  width: min(360px, 90vw);
+  box-shadow: 0 4px 24px rgb(0 0 0 / 0.15);
+}
+
+.dialog-msg {
+  margin: 0 0 1.2rem;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
 @media (max-width: 768px) {
+  .sort-mobile {
+    display: inline-block;
+  }
+
+  .th-date {
+    pointer-events: none;
+  }
+
   .table thead {
     display: none;
   }
