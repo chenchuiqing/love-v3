@@ -59,11 +59,24 @@ const particleThemeOptions: { value: ParticleTheme; label: string }[] = [
   { value: 'neon', label: '霓虹' },
 ]
 
+const DEFAULT_COLOR_PALETTE = ['#42A5F5', '#EF5350', '#26C6DA', '#EC407A', '#66BB6A', '#5C6BC0', '#FFB300', '#AB47BC']
+
+const randomColor = () => {
+  const base = DEFAULT_COLOR_PALETTE[Math.floor(Math.random() * DEFAULT_COLOR_PALETTE.length)]
+  const r = parseInt(base.slice(1, 3), 16)
+  const g = parseInt(base.slice(3, 5), 16)
+  const b = parseInt(base.slice(5, 7), 16)
+  const vary = () => Math.round((Math.random() - 0.5) * 50)
+  const clamp = (n: number) => Math.max(0, Math.min(255, n))
+  const toHex = (n: number) => n.toString(16).padStart(2, '0')
+  return `#${toHex(clamp(r + vary()))}${toHex(clamp(g + vary()))}${toHex(clamp(b + vary()))}`
+}
+
 const form = reactive<FormState>({
   type: 'photo',
   title: '',
   date: '',
-  color: '#6AA0FF',
+  color: randomColor(),
   theta: 1.8,
   phi: 1.2,
   orbitRadius: 1.08,
