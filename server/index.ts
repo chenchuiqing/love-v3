@@ -3,11 +3,13 @@ import { Hono } from 'hono'
 import { mkdirSync } from 'node:fs'
 
 import type { AppVariables } from './auth'
-import { requireAuth } from './auth'
+import { requireUserAuth } from './auth'
 import { env } from './config'
 import './db'
-import { authRoutes } from './routes/auth'
+import { userAuthRoutes } from './routes/auth'
+import { commentRoutes } from './routes/comments'
 import { memoryRoutes } from './routes/memories'
+import { notificationRoutes } from './routes/notifications'
 import { uploadRoutes } from './routes/upload'
 
 const app = new Hono<{ Variables: AppVariables }>()
@@ -26,11 +28,13 @@ app.get('/api/health', (c) => {
   return c.json({ ok: true, env: env.NODE_ENV })
 })
 
-app.route('/api/auth', authRoutes)
+app.route('/api/auth/user', userAuthRoutes)
 app.route('/api', memoryRoutes)
+app.route('/api', commentRoutes)
+app.route('/api', notificationRoutes)
 app.route('/api', uploadRoutes)
 
-app.get('/api/admin/health', requireAuth, (c) => {
+app.get('/api/publish/health', requireUserAuth, (c) => {
   return c.json({ ok: true })
 })
 

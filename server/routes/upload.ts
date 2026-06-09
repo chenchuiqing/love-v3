@@ -4,7 +4,7 @@ import { extname, join } from 'node:path'
 
 import { Hono } from 'hono'
 
-import { requireAuth, type AppVariables } from '../auth'
+import { requireUserAuth, type AppVariables } from '../auth'
 import { env } from '../config'
 
 const IMAGE_PREFIX = 'image/'
@@ -27,7 +27,7 @@ const isAllowedMime = (mimeType: string): boolean => {
 
 export const uploadRoutes = new Hono<{ Variables: AppVariables }>()
 
-uploadRoutes.post('/admin/upload', requireAuth, async (c) => {
+uploadRoutes.post('/publish/upload', requireUserAuth, async (c) => {
   const body = await c.req.parseBody({ all: false })
   const file = body.file
 

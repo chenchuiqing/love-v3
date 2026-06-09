@@ -1,7 +1,9 @@
 import { Hono } from 'hono'
 
-import { requireAuth, type AppVariables } from '../auth'
+import { requireUserAuth, type AppVariables } from '../auth'
+import { getOtherUserId } from '../config'
 import { createMemory, deleteMemory, getMemoryById, listMemories, updateMemory } from '../memories'
+import { createNotification } from '../notifications'
 import { createMemoryInputSchema, updateMemoryInputSchema } from '../types'
 
 export const memoryRoutes = new Hono<{ Variables: AppVariables }>()
@@ -10,11 +12,11 @@ memoryRoutes.get('/memories', (c) => {
   return c.json({ data: listMemories() })
 })
 
-memoryRoutes.get('/admin/memories', requireAuth, (c) => {
+memoryRoutes.get('/publish/memories', requireUserAuth, (c) => {
   return c.json({ data: listMemories() })
 })
 
-memoryRoutes.get('/admin/memories/:id', requireAuth, (c) => {
+memoryRoutes.get('/publish/memories/:id', requireUserAuth, (c) => {
   const id = c.req.param('id')
   const memory = getMemoryById(id)
   if (!memory) {
@@ -23,7 +25,7 @@ memoryRoutes.get('/admin/memories/:id', requireAuth, (c) => {
   return c.json({ data: memory })
 })
 
-memoryRoutes.post('/admin/memories', requireAuth, async (c) => {
+memoryRoutes.post('/publish/memories', requireUserAuth, async (c) => {
   const body = await c.req.json().catch(() => null)
   const parsed = createMemoryInputSchema.safeParse(body)
 
@@ -33,6 +35,19 @@ memoryRoutes.post('/admin/memories', requireAuth, async (c) => {
 
   try {
     const memory = createMemory(parsed.data)
+
+    const session = c.get('userSession')
+    const otherUserId = getOtherUserId(session.userId)
+    createNotification({
+      userId: otherUserId,
+      type: 'new_memory',
+      title: `「${session.userName}」发布了新记忆「${memory.title}」`,
+      content: memory.content.text?.slice(0, 100) ?? '',
+      memoryId: memory.id,
+      actorId: session.userId,
+      actorName: session.userName,
+    })
+
     return c.json({ data: memory }, 201)
   } catch (error) {
     if (error instanceof Error && error.message === 'ID 已存在') {
@@ -42,7 +57,7 @@ memoryRoutes.post('/admin/memories', requireAuth, async (c) => {
   }
 })
 
-memoryRoutes.put('/admin/memories/:id', requireAuth, async (c) => {
+memoryRoutes.put('/publish/memories/:id', requireUserAuth, async (c) => {
   const id = c.req.param('id')
   const body = await c.req.json().catch(() => null)
   const parsed = updateMemoryInputSchema.safeParse(body)
@@ -59,7 +74,7 @@ memoryRoutes.put('/admin/memories/:id', requireAuth, async (c) => {
   return c.json({ data: updated })
 })
 
-memoryRoutes.delete('/admin/memories/:id', requireAuth, (c) => {
+memoryRoutes.delete('/publish/memories/:id', requireUserAuth, (c) => {
   const id = c.req.param('id')
   const removed = deleteMemory(id)
 

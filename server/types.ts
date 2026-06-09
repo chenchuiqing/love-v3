@@ -77,3 +77,61 @@ export const updateMemoryInputSchema = z.object({
 export type MemoryDto = z.infer<typeof memorySchema>
 export type CreateMemoryInput = z.infer<typeof createMemoryInputSchema>
 export type UpdateMemoryInput = z.infer<typeof updateMemoryInputSchema>
+
+export const createCommentInputSchema = z.object({
+  parentId: z.string().min(1).optional(),
+  content: z.string().min(1, '评论内容不能为空'),
+})
+
+export type CreateCommentInput = z.infer<typeof createCommentInputSchema>
+
+export interface CommentRow {
+  id: string
+  memory_id: string
+  parent_id: string | null
+  user_id: string
+  user_name: string
+  content: string
+  created_at: string
+}
+
+export interface CommentDto {
+  id: string
+  memoryId: string
+  parentId: string | null
+  userId: string
+  userName: string
+  content: string
+  createdAt: string
+  replies: CommentDto[]
+}
+
+export type NotificationType = 'new_memory' | 'new_comment' | 'new_reply'
+
+export interface NotificationRow {
+  id: string
+  user_id: string
+  type: string
+  title: string
+  content: string | null
+  memory_id: string
+  comment_id: string | null
+  actor_id: string
+  actor_name: string
+  is_read: number
+  created_at: string
+}
+
+export interface NotificationDto {
+  id: string
+  userId: string
+  type: NotificationType
+  title: string
+  content: string | null
+  memoryId: string
+  commentId: string | null
+  actorId: string
+  actorName: string
+  isRead: boolean
+  createdAt: string
+}
