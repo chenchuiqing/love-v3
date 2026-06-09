@@ -5,11 +5,11 @@ import { useRoute, useRouter } from 'vue-router'
 import type { Memory, MemoryType, ParticleTheme } from '@/types/memory'
 import { ApiError } from '@/api/client'
 import {
-  createAdminMemory,
-  fetchAdminMemories,
-  fetchAdminMemoryById,
-  updateAdminMemory,
-  uploadAdminMedia,
+  createPublishMemory,
+  fetchPublishMemories,
+  fetchPublishMemoryById,
+  updatePublishMemory,
+  uploadPublishMedia,
 } from '@/api/memories'
 import MemoryDetail from '@/components/MemoryDetail.vue'
 import MemoryPlanet from '@/components/MemoryPlanet.vue'
@@ -156,33 +156,7 @@ const applyMemoryToForm = (memory: Memory) => {
   form.theme = memory.content.theme ?? 'default'
 }
 
-const buildCreatePayload = (): Omit<Memory, 'id'> => {
-  const imageUrls = getSanitizedImageUrls()
-  const fallbackImageUrl = form.imageUrl.trim()
-  const resolvedImageUrl = imageUrls[0] ?? fallbackImageUrl
-  return {
-    type: form.type,
-    title: form.title,
-    date: form.date,
-    color: form.color,
-    orbitRadius: Number(form.orbitRadius),
-    position: {
-      theta: Number(form.theta),
-      phi: Number(form.phi),
-    },
-    content: {
-      text: form.text || undefined,
-      imageUrl: resolvedImageUrl || undefined,
-      imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
-      audioUrl: form.audioUrl || undefined,
-      videoUrl: form.videoUrl || undefined,
-      location: form.location || undefined,
-      theme: form.theme || undefined,
-    },
-  }
-}
-
-const buildUpdatePayload = (): Omit<Memory, 'id'> => {
+const buildPayload = (): Omit<Memory, 'id'> => {
   const imageUrls = getSanitizedImageUrls()
   const fallbackImageUrl = form.imageUrl.trim()
   const resolvedImageUrl = imageUrls[0] ?? fallbackImageUrl
@@ -211,7 +185,7 @@ const buildUpdatePayload = (): Omit<Memory, 'id'> => {
 const loadPreviewCatalog = async () => {
   previewErrorMessage.value = ''
   try {
-    previewCatalog.value = await fetchAdminMemories()
+    previewCatalog.value = await fetchPublishMemories()
   } catch (error) {
     if (error instanceof Error) {
       previewErrorMessage.value = error.message
@@ -236,7 +210,7 @@ const uploadFile = async (file: File, target: 'audio' | 'video') => {
     isUploadingVideo.value = true
   }
   try {
-    const url = await uploadAdminMedia(file)
+    const url = await uploadPublishMedia(file)
     if (target === 'audio') {
       form.audioUrl = url
     } else {
@@ -280,7 +254,7 @@ const handleUploadImage = async (event: Event) => {
   try {
     const uploaded: string[] = []
     for (const file of selected) {
-      const url = await uploadAdminMedia(file)
+      const url = await uploadPublishMedia(file)
       if (!existing.includes(url) && !uploaded.includes(url)) {
         uploaded.push(url)
       }
@@ -350,11 +324,11 @@ const handleSubmit = async () => {
   submitting.value = true
   try {
     if (isEditMode.value) {
-      await updateAdminMemory(currentId.value, buildUpdatePayload())
+      await updatePublishMemory(currentId.value, buildPayload())
     } else {
-      await createAdminMemory(buildCreatePayload())
+      await createPublishMemory(buildPayload())
     }
-    await router.push({ name: 'AdminMemoryList' })
+    await router.push({ name: 'PublishMemoryList' })
   } catch (error) {
     if (error instanceof ApiError && error.status === 409) {
       errorMessage.value = '保存失败，请稍后重试'
@@ -387,7 +361,7 @@ onMounted(async () => {
   }
   loading.value = true
   try {
-    const memory = await fetchAdminMemoryById(currentId.value)
+    const memory = await fetchPublishMemoryById(currentId.value)
     applyMemoryToForm(memory)
   } catch (error) {
     if (error instanceof Error) {
@@ -526,7 +500,7 @@ onMounted(async () => {
         </div>
 
         <div class="footer">
-          <RouterLink :to="{ name: 'AdminMemoryList' }">取消</RouterLink>
+          <RouterLink :to="{ name: 'PublishMemoryList' }">取消</RouterLink>
           <button type="submit" :disabled="submitting">
             {{
               submitting

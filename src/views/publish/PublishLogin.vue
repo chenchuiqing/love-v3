@@ -1,23 +1,37 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { ApiError } from '@/api/client'
-import { loginAdmin } from '@/api/auth'
+import { getUserOptions, userLogin } from '@/api/userAuth'
+
+interface UserOption {
+  id: string
+  name: string
+}
 
 const route = useRoute()
 const router = useRouter()
 
+const options = ref<UserOption[]>([])
+const selectedUser = ref<UserOption | null>(null)
 const password = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
 
-const redirectPath = computed(() => {
-  const redirect = route.query.redirect
-  return typeof redirect === 'string' && redirect.startsWith('/admin') ? redirect : '/admin/memories'
+onMounted(async () => {
+  try {
+    options.value = await getUserOptions()
+  } catch {
+    errorMessage.value = '获取用户列表失败'
+  }
 })
 
 const handleSubmit = async () => {
+  if (!selectedUser.value) {
+    errorMessage.value = '请选择身份'
+    return
+  }
   if (!password.value) {
     errorMessage.value = '请输入密码'
     return
@@ -26,15 +40,17 @@ const handleSubmit = async () => {
   loading.value = true
   errorMessage.value = ''
   try {
-    await loginAdmin(password.value)
-    await router.replace(redirectPath.value)
+    await userLogin(selectedUser.value.name, password.value)
+    const redirect = route.query.redirect
+    const target = typeof redirect === 'string' && redirect.startsWith('/publish') ? redirect : '/publish/memories'
+    await router.replace(target)
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       errorMessage.value = '密码错误'
     } else if (error instanceof Error) {
       errorMessage.value = error.message
     } else {
-      errorMessage.value = '登录失败，请稍后重试'
+      errorMessage.value = '登录失败'
     }
   } finally {
     loading.value = false
@@ -45,14 +61,29 @@ const handleSubmit = async () => {
 <template>
   <div class="login-page">
     <form class="login-card" @submit.prevent="handleSubmit">
-      <h1>后台登录</h1>
-      <p class="hint">仅管理员可访问记忆点管理功能</p>
-      <label>
-        管理密码
+      <h1>发布管理</h1>
+      <p class="hint">选择你的身份并输入密码</p>
+
+      <div class="user-options">
+        <button
+          v-for="opt in options"
+          :key="opt.id"
+          type="button"
+          class="user-btn"
+          :class="{ active: selectedUser?.id === opt.id }"
+          @click="selectedUser = opt"
+        >
+          {{ opt.name }}
+        </button>
+      </div>
+
+      <label v-if="selectedUser">
+        {{ selectedUser.name }} 的密码
         <input v-model="password" type="password" autocomplete="current-password" />
       </label>
+
       <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
-      <button type="submit" :disabled="loading">
+      <button v-if="selectedUser" type="submit" :disabled="loading">
         {{ loading ? '登录中...' : '登录' }}
       </button>
     </form>
@@ -88,6 +119,32 @@ const handleSubmit = async () => {
   font-size: 0.9rem;
 }
 
+.user-options {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.user-btn {
+  flex: 1;
+  padding: 0.75rem;
+  border: 2px solid #d0d7e8;
+  border-radius: 0.6rem;
+  background: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.user-btn:hover {
+  border-color: #5a7ec4;
+}
+
+.user-btn.active {
+  border-color: #243b76;
+  background: #eef3fe;
+  font-weight: 600;
+}
+
 label {
   display: grid;
   gap: 0.4rem;
@@ -101,7 +158,7 @@ input {
   font-size: 1rem;
 }
 
-button {
+button[type='submit'] {
   border: none;
   border-radius: 0.55rem;
   padding: 0.58rem 0.75rem;
@@ -110,7 +167,7 @@ button {
   cursor: pointer;
 }
 
-button:disabled {
+button[type='submit']:disabled {
   opacity: 0.7;
   cursor: not-allowed;
 }

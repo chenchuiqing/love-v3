@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 
 import type { Memory } from '@/types/memory'
 import { ApiError } from '@/api/client'
-import { deleteAdminMemory, fetchAdminMemories } from '@/api/memories'
+import { deletePublishMemory, fetchPublishMemories } from '@/api/memories'
 
 const memories = ref<Memory[]>([])
 const loading = ref(false)
@@ -50,7 +50,7 @@ const loadMemories = async () => {
   loading.value = true
   errorMessage.value = ''
   try {
-    const data = await fetchAdminMemories()
+    const data = await fetchPublishMemories()
     memories.value = sortMemories(data)
   } catch (error) {
     if (error instanceof Error) {
@@ -71,7 +71,7 @@ const handleDelete = async () => {
   errorMessage.value = ''
   confirmVisible.value = false
   try {
-    await deleteAdminMemory(id)
+    await deletePublishMemory(id)
     memories.value = memories.value.filter((item) => item.id !== id)
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
@@ -97,7 +97,7 @@ onMounted(() => {
 <template>
   <section class="panel">
     <div class="toolbar">
-      <RouterLink class="primary" :to="{ name: 'AdminMemoryCreate' }">新增记忆点</RouterLink>
+      <RouterLink class="primary" :to="{ name: 'PublishMemoryCreate' }">新增记忆点</RouterLink>
       <button type="button" @click="loadMemories">刷新</button>
       <button type="button" class="sort-mobile" @click="toggleSort">
         {{ sortOrder === 'asc' ? '↑ 升序' : '↓ 降序' }}
@@ -135,7 +135,7 @@ onMounted(() => {
           </td>
           <td data-label="操作" class="actions-cell">
             <a :href="`/?memory=${item.id}`" target="_blank" rel="noreferrer">预览</a>
-            <RouterLink :to="{ name: 'AdminMemoryEdit', params: { id: item.id } }">编辑</RouterLink>
+            <RouterLink :to="{ name: 'PublishMemoryEdit', params: { id: item.id } }">编辑</RouterLink>
             <button
               type="button"
               class="danger"

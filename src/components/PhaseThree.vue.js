@@ -1,0 +1,1797 @@
+/// <reference types="C:/Users/cheng/AppData/Local/Temp/bunx-953292910-vue-tsc@latest/node_modules/@vue/language-core/types/template-helpers.d.ts" />
+/// <reference types="C:/Users/cheng/AppData/Local/Temp/bunx-953292910-vue-tsc@latest/node_modules/@vue/language-core/types/props-fallback.d.ts" />
+import { ref, onMounted, onUnmounted, nextTick } from 'vue';
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshSurfaceSampler } from 'three/examples/jsm/math/MeshSurfaceSampler.js';
+import gsap from 'gsap';
+import html2canvas from 'html2canvas';
+import { Fireworks } from 'fireworks-js';
+const emit = defineEmits();
+const PHOTO_URL = '/photo.jpg';
+const CONFESSION_LINES = [
+    '咏欣，很高兴遇见你~',
+    '见字如面。',
+    '其实在写下这些字之前，我心里非常高兴但又伴随着些许失落。高兴的是终于可以把准备了这么长时间的"花"与你见面了，失落的是让你久等了...',
+    '你一直说缺了份给你的鲜花与告白，所以，这是一份迟来的告白，我想把之前欠你的、本该属于你的那份仪式感，原原本本地为你补上。',
+    '你常问我你有哪些优点？哪些缺点？我想，真正喜欢一个人，不是去爱一个完美无缺的幻影，而是爱一个真实、立体、鲜活的你。',
+    '在我的眼里，你有数不清的优点。你善良、懂事、为人真诚、待人友善，麻将打得也好。对了，你歌唱的也好听~ 你笑起来的样子，真的非常好看！！！',
+    '但同时，我也看到了你的"小缺点"。我知道你偶尔会犯懒，甚至有的时候，连下雨天你也懒得带伞，总是冒冒失失的。还经常忘带东西，遇到事情的时候会犹豫不决、习惯性拖延。偶尔有些小脾气，偶尔会敏感、会焦虑。但你知道吗？每当看到这些时候的你，我不仅没有半点不耐烦，反而觉得你无比可爱。这些不完美，恰恰让你变得无比真实。它提醒着我，眼前的女孩不是神坛上的雕塑，而是一个需要被好好珍藏、好好保护的宝贝。',
+    '所以，我想认真地告诉你：我喜欢你，喜欢你的全部。',
+    '在这个世界上，人人都在权衡利弊，都在讲究对等，但在你这里，我想给你我全部的偏爱。',
+    '我的偏爱是，无论人群多么拥挤，我的目光总会第一时间落在你身上；是我的"双标"，别人不行的事在你这有无限的特权；是哪怕全世界都要求你懂事、听话、做个成熟的大人，在我这里，你永远可以只做那个被宠溺、可以随时撒娇、不用讲道理的小女孩。',
+    '我不想只参与你的快乐，我更想在那些阴天里，做那个为你撑伞、听你诉苦、给你兜底的人。',
+    '这份告白虽然迟到了，但我对你的爱意永远不会缺席。往后的日子里，不管是晴是雨，我都想陪你一起走。未来的路途，有我！！！'
+];
+const containerRef = ref(null);
+const drawingCanvasRef = ref(null);
+const fireworksCanvas = ref(null);
+const photoRef = ref(null);
+const letterCardRef = ref(null);
+const hasInteracted = ref(false);
+const isCollapsing = ref(false);
+const currentAct = ref(1);
+const showShapeHint = ref(false);
+const photoStyle = ref({ width: '0px', height: '0px', opacity: 0 });
+const showEnvelopeHint = ref(false);
+const showLetterOverlay = ref(false);
+const typedLines = ref(CONFESSION_LINES.map(() => ''));
+const isEnvelopeOpening = ref(false);
+const isTypingFinished = ref(false);
+const showSaveBtn = ref(false);
+const showFireworksBtn = ref(false);
+const fireworksOn = ref(false);
+let scene;
+let camera;
+let renderer;
+let animationId = 0;
+let particles;
+let particleGeometry;
+let particleMaterial;
+let particlePositions;
+let particleColors;
+let basePositions;
+let act2BasePositions = null;
+let envelopeKindArr = null;
+let roseTargets = null;
+let heartSnapshot = null;
+let firstPathPoint = null;
+let act2BreathingTime = 0;
+let act4BreathingTime = 0;
+let shapeHintTimer = null;
+let fireworksInstance = null;
+let fireworksLaunchEndTimer = null;
+/** 默认自动播放时，持续发射烟花的时长（毫秒） */
+const DEFAULT_FIREWORKS_LAUNCH_MS = 3000;
+const FIREWORKS_OPTIONS = {
+    rocketsPoint: { min: 10, max: 90 },
+    hue: { min: 320, max: 360 },
+    delay: { min: 18, max: 36 },
+    acceleration: 1.02,
+    friction: 0.97,
+    gravity: 1.5,
+    particles: 90,
+    explosion: 6,
+    autoresize: true,
+    brightness: { min: 55, max: 80 },
+    decay: { min: 0.015, max: 0.03 },
+    flickering: 50,
+    intensity: 22,
+    traceSpeed: 8,
+    lineWidth: { explosion: { min: 1, max: 3 }, trace: { min: 1, max: 2 } }
+};
+const ensureFireworks = () => {
+    if (fireworksInstance)
+        return fireworksInstance;
+    if (!fireworksCanvas.value)
+        return null;
+    fireworksInstance = new Fireworks(fireworksCanvas.value, FIREWORKS_OPTIONS);
+    return fireworksInstance;
+};
+const clearFireworksLaunchEndTimer = () => {
+    if (fireworksLaunchEndTimer) {
+        clearTimeout(fireworksLaunchEndTimer);
+        fireworksLaunchEndTimer = null;
+    }
+};
+const stopFireworksImmediately = (dispose = false) => {
+    clearFireworksLaunchEndTimer();
+    if (fireworksInstance) {
+        fireworksInstance.stop(dispose);
+    }
+    fireworksOn.value = false;
+};
+/** 发射窗口结束后：停止新烟花，等待已升空烟花炸完 */
+const finishFireworksLaunchWindow = async () => {
+    const instance = fireworksInstance;
+    if (!instance?.isRunning)
+        return;
+    try {
+        await instance.waitStop();
+    }
+    finally {
+        fireworksOn.value = false;
+    }
+};
+const scheduleFireworksLaunchWindow = (durationMs = DEFAULT_FIREWORKS_LAUNCH_MS) => {
+    clearFireworksLaunchEndTimer();
+    fireworksLaunchEndTimer = setTimeout(() => {
+        fireworksLaunchEndTimer = null;
+        void finishFireworksLaunchWindow();
+    }, durationMs);
+};
+const toggleFireworks = () => {
+    const instance = ensureFireworks();
+    if (!instance)
+        return;
+    if (instance.isRunning) {
+        stopFireworksImmediately();
+    }
+    else {
+        clearFireworksLaunchEndTimer();
+        instance.start();
+        fireworksOn.value = true;
+    }
+};
+const PARTICLE_COUNT = 15000;
+const pathPoints = [];
+/** 与 drawingCanvas 像素一致的屏幕轨迹，供识别与海报快照；避免 world→NDC 误差与抬笔后连线 */
+const traceScreenPoints = [];
+/** 每一笔的起点在 traceScreenPoints 中的下标，快照时用 moveTo 断开，避免出现穿心竖线 */
+const traceStrokeStarts = [];
+const highlightedIndices = new Set();
+const pointerState = {
+    isDrawing: false
+};
+const envelopeTouchState = {
+    startX: 0,
+    startY: 0,
+    startTime: 0,
+    active: false
+};
+const act4RotateState = {
+    isDragging: false,
+    lastX: 0,
+    lastY: 0,
+    velocityX: 0,
+    velocityY: 0
+};
+const createParticleTexture = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 32;
+    canvas.height = 32;
+    const ctx = canvas.getContext('2d');
+    const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    gradient.addColorStop(0.22, 'rgba(219, 232, 255, 0.92)');
+    gradient.addColorStop(0.58, 'rgba(136, 182, 255, 0.34)');
+    gradient.addColorStop(1, 'transparent');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 32, 32);
+    return new THREE.CanvasTexture(canvas);
+};
+const initScene = () => {
+    if (!containerRef.value)
+        return;
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000010);
+    camera = new THREE.PerspectiveCamera(56, containerRef.value.clientWidth / containerRef.value.clientHeight, 0.1, 100);
+    camera.position.set(0, 0, 4);
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+    renderer.setSize(containerRef.value.clientWidth, containerRef.value.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    containerRef.value.appendChild(renderer.domElement);
+    particleGeometry = new THREE.BufferGeometry();
+    particlePositions = new Float32Array(PARTICLE_COUNT * 3);
+    basePositions = new Float32Array(PARTICLE_COUNT * 3);
+    particleColors = new Float32Array(PARTICLE_COUNT * 3);
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+        const x = (Math.random() - 0.5) * 12;
+        const y = (Math.random() - 0.5) * 7;
+        const z = (Math.random() - 0.5) * 0.25;
+        particlePositions[i * 3] = x;
+        particlePositions[i * 3 + 1] = y;
+        particlePositions[i * 3 + 2] = z;
+        basePositions[i * 3] = x;
+        basePositions[i * 3 + 1] = y;
+        basePositions[i * 3 + 2] = z;
+        particleColors[i * 3] = 0.88 + Math.random() * 0.12;
+        particleColors[i * 3 + 1] = 0.9 + Math.random() * 0.1;
+        particleColors[i * 3 + 2] = 1;
+    }
+    particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+    particleGeometry.setAttribute('color', new THREE.BufferAttribute(particleColors, 3));
+    particleMaterial = new THREE.PointsMaterial({
+        size: 0.035,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.86,
+        map: createParticleTexture(),
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+    });
+    particles = new THREE.Points(particleGeometry, particleMaterial);
+    scene.add(particles);
+};
+const animate = () => {
+    animationId = requestAnimationFrame(animate);
+    if (currentAct.value === 1) {
+        particles.rotation.z += 0.0005;
+    }
+    if (currentAct.value === 2 && act2BasePositions) {
+        act2BreathingTime += 0.03;
+        for (let i = 0; i < PARTICLE_COUNT; i += 20) {
+            const baseY = act2BasePositions[i * 3 + 1];
+            particlePositions[i * 3 + 1] = baseY + Math.sin(act2BreathingTime + i * 0.01) * 0.03;
+        }
+        particleGeometry.attributes.position.needsUpdate = true;
+    }
+    if (currentAct.value === 4 && roseTargets) {
+        act4BreathingTime += 0.018;
+        // 花瓣微幅呼吸（仅对采样的稀疏粒子）
+        for (let i = 0; i < PARTICLE_COUNT; i += 7) {
+            const phase = act4BreathingTime + i * 0.013;
+            const offset = Math.sin(phase) * 0.012;
+            particlePositions[i * 3] = roseTargets[i * 3] + Math.cos(phase * 0.7) * 0.008;
+            particlePositions[i * 3 + 1] = roseTargets[i * 3 + 1] + offset;
+            particlePositions[i * 3 + 2] = roseTargets[i * 3 + 2] + Math.sin(phase * 0.9) * 0.008;
+        }
+        particleGeometry.attributes.position.needsUpdate = true;
+        // 自由旋转 + 拖拽惯性
+        if (!act4RotateState.isDragging) {
+            particles.rotation.y += act4RotateState.velocityX * 0.6 + 0.0025;
+            particles.rotation.x += act4RotateState.velocityY * 0.6;
+            act4RotateState.velocityX *= 0.92;
+            act4RotateState.velocityY *= 0.92;
+        }
+    }
+    renderer.render(scene, camera);
+};
+const resizeDrawingCanvas = () => {
+    if (!containerRef.value || !drawingCanvasRef.value)
+        return;
+    const w = containerRef.value.clientWidth;
+    const h = containerRef.value.clientHeight;
+    drawingCanvasRef.value.width = w;
+    drawingCanvasRef.value.height = h;
+    // 仅第一幕需要爱心引导线；后续幕 resize 时勿重绘，否则会叠在玫瑰背后
+    if (currentAct.value === 1) {
+        drawHeartOutline();
+    }
+};
+const drawHeartOutline = () => {
+    const canvas = drawingCanvasRef.value;
+    if (!canvas)
+        return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx)
+        return;
+    const w = canvas.width;
+    const h = canvas.height;
+    const cx = w / 2;
+    const cy = h / 2;
+    // 根据屏幕尺寸缩放爱心
+    const scale = Math.min(w, h) * 0.015;
+    ctx.save();
+    ctx.translate(cx, cy - scale * 2);
+    ctx.scale(scale, scale);
+    ctx.beginPath();
+    // 标准爱心参数方程 t: [0, 2PI]
+    for (let t = 0; t <= Math.PI * 2; t += 0.05) {
+        const x = 16 * Math.pow(Math.sin(t), 3);
+        const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+        if (t === 0)
+            ctx.moveTo(x, y);
+        else
+            ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.lineWidth = 0.5;
+    ctx.setLineDash([4, 6]);
+    ctx.stroke();
+    ctx.restore();
+};
+const drawTrailSegment = (from, to) => {
+    const canvas = drawingCanvasRef.value;
+    if (!canvas || !containerRef.value)
+        return;
+    const rect = containerRef.value.getBoundingClientRect();
+    const ctx = canvas.getContext('2d');
+    if (!ctx)
+        return;
+    ctx.strokeStyle = 'rgba(255, 211, 236, 0.9)';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = 'rgba(255, 108, 176, 0.7)';
+    ctx.beginPath();
+    ctx.moveTo(from.clientX - rect.left, from.clientY - rect.top);
+    ctx.lineTo(to.clientX - rect.left, to.clientY - rect.top);
+    ctx.stroke();
+};
+const screenToWorld = (clientX, clientY) => {
+    const rect = containerRef.value.getBoundingClientRect();
+    const ndc = new THREE.Vector3(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1, 0);
+    ndc.unproject(camera);
+    const direction = ndc.sub(camera.position).normalize();
+    const distance = -camera.position.z / direction.z;
+    return camera.position.clone().add(direction.multiplyScalar(distance));
+};
+const attractParticlesToPoint = (worldPoint) => {
+    const candidateCount = 20;
+    const candidates = [];
+    for (let i = 0; i < PARTICLE_COUNT; i += 6) {
+        const px = particlePositions[i * 3];
+        const py = particlePositions[i * 3 + 1];
+        const dx = px - worldPoint.x;
+        const dy = py - worldPoint.y;
+        const dist = dx * dx + dy * dy;
+        if (candidates.length < candidateCount) {
+            candidates.push({ index: i, dist });
+            continue;
+        }
+        let maxIdx = 0;
+        for (let j = 1; j < candidates.length; j++) {
+            if (candidates[j].dist > candidates[maxIdx].dist) {
+                maxIdx = j;
+            }
+        }
+        if (dist < candidates[maxIdx].dist) {
+            candidates[maxIdx] = { index: i, dist };
+        }
+    }
+    for (const candidate of candidates) {
+        const i = candidate.index;
+        highlightedIndices.add(i);
+        particlePositions[i * 3] += (worldPoint.x - particlePositions[i * 3]) * 0.22;
+        particlePositions[i * 3 + 1] += (worldPoint.y - particlePositions[i * 3 + 1]) * 0.22;
+        particlePositions[i * 3 + 2] += (0 - particlePositions[i * 3 + 2]) * 0.16;
+    }
+    particleGeometry.attributes.position.needsUpdate = true;
+};
+const checkTraceCoverage = () => {
+    const canvas = drawingCanvasRef.value;
+    if (!canvas)
+        return false;
+    const w = canvas.width;
+    const h = canvas.height;
+    const cx = w / 2;
+    const cy = h / 2;
+    const scale = Math.min(w, h) * 0.015;
+    // 1. 生成标准的爱心轮廓上的采样点
+    const heartPoints = [];
+    for (let t = 0; t < Math.PI * 2; t += 0.2) {
+        const hx = 16 * Math.pow(Math.sin(t), 3);
+        const hy = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+        heartPoints.push({
+            x: cx + hx * scale,
+            y: cy - scale * 2 + hy * scale
+        });
+    }
+    // 2. 使用真实屏幕轨迹（与 drawTrailSegment 同源），避免错误 project 导致形变
+    const screenPathPoints = traceScreenPoints.length >= 2
+        ? traceScreenPoints
+        : pathPoints.map((p) => {
+            const v = new THREE.Vector3(p.x, p.y, 0);
+            v.project(camera);
+            return {
+                x: ((v.x + 1) / 2) * w,
+                y: ((-v.y + 1) / 2) * h
+            };
+        });
+    // 3. 计算覆盖率（只要离标准点足够近就算覆盖）
+    let coveredCount = 0;
+    const thresholdDistSq = Math.pow(Math.min(w, h) * 0.08, 2); // 容差范围
+    for (const hp of heartPoints) {
+        let isCovered = false;
+        for (const sp of screenPathPoints) {
+            const dx = hp.x - sp.x;
+            const dy = hp.y - sp.y;
+            if (dx * dx + dy * dy < thresholdDistSq) {
+                isCovered = true;
+                break;
+            }
+        }
+        if (isCovered)
+            coveredCount++;
+    }
+    return (coveredCount / heartPoints.length) >= 0.75; // 75% 覆盖率即算完成
+};
+const isHeartRecognized = () => {
+    return checkTraceCoverage();
+};
+const showHintTemporarily = () => {
+    showShapeHint.value = true;
+    if (shapeHintTimer)
+        clearTimeout(shapeHintTimer);
+    shapeHintTimer = setTimeout(() => {
+        showShapeHint.value = false;
+    }, 1500);
+};
+const samplePhotoTargets = () => new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+        const W = 160;
+        const H = Math.max(1, Math.round((W * img.height) / img.width));
+        const canvas = document.createElement('canvas');
+        canvas.width = W;
+        canvas.height = H;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            resolve(new Float32Array(basePositions));
+            return;
+        }
+        ctx.drawImage(img, 0, 0, W, H);
+        const data = ctx.getImageData(0, 0, W, H).data;
+        // 限制最大宽高，使其成为一个小相框
+        let worldH = 2.6;
+        let worldW = worldH * (W / H);
+        if (worldW > 3.5) {
+            worldW = 3.5;
+            worldH = worldW * (H / W);
+        }
+        // 计算相框在屏幕上的实际像素尺寸
+        const vFov = 56 * Math.PI / 180;
+        const visibleHeight = 2 * Math.tan(vFov / 2) * 4; // camera.z = 4
+        if (containerRef.value) {
+            const pixelHeight = (worldH / visibleHeight) * containerRef.value.clientHeight;
+            const pixelWidth = (worldW / visibleHeight) * containerRef.value.clientHeight;
+            photoStyle.value.width = `${pixelWidth}px`;
+            photoStyle.value.height = `${pixelHeight}px`;
+        }
+        const targets = new Float32Array(PARTICLE_COUNT * 3);
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+            let px = 0;
+            let py = 0;
+            let tries = 0;
+            do {
+                px = Math.floor(Math.random() * W);
+                py = Math.floor(Math.random() * H);
+                const base = (py * W + px) * 4;
+                const gray = (data[base] + data[base + 1] + data[base + 2]) / 3;
+                if (Math.random() < (255 - gray) / 255 + 0.12)
+                    break;
+                tries += 1;
+            } while (tries < 30);
+            targets[i * 3] = ((px + 0.5) / W - 0.5) * worldW;
+            targets[i * 3 + 1] = -((py + 0.5) / H - 0.5) * worldH;
+            targets[i * 3 + 2] = (Math.random() - 0.5) * 0.1;
+        }
+        resolve(targets);
+    };
+    img.onerror = () => resolve(new Float32Array(basePositions));
+    img.src = PHOTO_URL;
+});
+/**
+ * 计算信封形状的粒子目标位置。
+ * kind 含义: 0=信封主体 / 1=V 形折线 / 2=封口三角翼 / 3=蜡印圆簇
+ */
+const computeEnvelopePositions = () => {
+    const positions = new Float32Array(PARTICLE_COUNT * 3);
+    const kinds = new Uint8Array(PARTICLE_COUNT);
+    const envW = 2.6;
+    const envH = 1.7;
+    const cx = 0;
+    const cy = -0.25;
+    const halfW = envW / 2;
+    const halfH = envH / 2;
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+        const r = Math.random();
+        let kind;
+        let x = 0;
+        let y = 0;
+        let z = (Math.random() - 0.5) * 0.06;
+        if (r < 0.6) {
+            kind = 0;
+            // 矩形主体：偏向边缘的粒子密度更高
+            const onEdge = Math.random() < 0.55;
+            if (onEdge) {
+                const side = Math.floor(Math.random() * 4);
+                if (side === 0) {
+                    x = cx - halfW + Math.random() * envW;
+                    y = cy + halfH - Math.random() * 0.04;
+                }
+                else if (side === 1) {
+                    x = cx - halfW + Math.random() * envW;
+                    y = cy - halfH + Math.random() * 0.04;
+                }
+                else if (side === 2) {
+                    x = cx - halfW + Math.random() * 0.04;
+                    y = cy - halfH + Math.random() * envH;
+                }
+                else {
+                    x = cx + halfW - Math.random() * 0.04;
+                    y = cy - halfH + Math.random() * envH;
+                }
+            }
+            else {
+                x = cx + (Math.random() - 0.5) * envW;
+                y = cy + (Math.random() - 0.5) * envH;
+            }
+        }
+        else if (r < 0.8) {
+            kind = 1;
+            // V 形：从底角到中心顶部（顶端约位于矩形高度 60% 处）
+            const apexY = cy + halfH * 0.05;
+            const apexX = cx;
+            const leftCorner = { x: cx - halfW, y: cy + halfH };
+            const rightCorner = { x: cx + halfW, y: cy + halfH };
+            const t = Math.random();
+            const useLeft = Math.random() < 0.5;
+            if (useLeft) {
+                x = leftCorner.x + (apexX - leftCorner.x) * t;
+                y = leftCorner.y + (apexY - leftCorner.y) * t;
+            }
+            else {
+                x = rightCorner.x + (apexX - rightCorner.x) * t;
+                y = rightCorner.y + (apexY - rightCorner.y) * t;
+            }
+            x += (Math.random() - 0.5) * 0.02;
+            y += (Math.random() - 0.5) * 0.02;
+        }
+        else if (r < 0.92) {
+            kind = 2;
+            // 封口三角翼：上方三角（自上沿向下到 V 顶点）
+            const apexY = cy + halfH * 0.05;
+            const topY = cy + halfH;
+            const t = Math.random();
+            const lineY = topY - (topY - apexY) * t;
+            const halfSpan = halfW * (1 - t);
+            x = cx + (Math.random() - 0.5) * halfSpan * 2;
+            y = lineY + (Math.random() - 0.5) * 0.015;
+            z += 0.04;
+        }
+        else {
+            kind = 3;
+            // 蜡印圆簇：信封正中略偏下
+            const angle = Math.random() * Math.PI * 2;
+            const radius = Math.sqrt(Math.random()) * 0.16;
+            x = cx + Math.cos(angle) * radius;
+            y = cy - 0.08 + Math.sin(angle) * radius;
+            z += 0.05;
+        }
+        positions[i * 3] = x;
+        positions[i * 3 + 1] = y;
+        positions[i * 3 + 2] = z;
+        kinds[i] = kind;
+    }
+    return { positions, kinds };
+};
+/**
+ * 加载 public/rose.glb 模型，并在其表面采样计算 3D 玫瑰花的粒子目标位置。
+ */
+const loadRoseModelTargets = async () => {
+    return new Promise((resolve) => {
+        const loader = new GLTFLoader();
+        loader.load('/rose.glb', (gltf) => {
+            const positions = new Float32Array(PARTICLE_COUNT * 3);
+            gltf.scene.updateMatrixWorld(true);
+            const meshes = [];
+            gltf.scene.traverse((child) => {
+                if (child.isMesh) {
+                    meshes.push(child);
+                }
+            });
+            if (meshes.length === 0) {
+                console.warn('No meshes found in rose.glb');
+                resolve(positions);
+                return;
+            }
+            const samplers = meshes.map(mesh => ({
+                sampler: new MeshSurfaceSampler(mesh).build(),
+                mesh: mesh
+            }));
+            const _position = new THREE.Vector3();
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                const { sampler, mesh } = samplers[Math.floor(Math.random() * samplers.length)];
+                sampler.sample(_position);
+                _position.applyMatrix4(mesh.matrixWorld);
+                positions[i * 3] = _position.x;
+                positions[i * 3 + 1] = _position.y;
+                positions[i * 3 + 2] = _position.z;
+            }
+            // Normalize and scale the positions
+            const box = new THREE.Box3();
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                _position.set(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
+                box.expandByPoint(_position);
+            }
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const scale = maxDim > 0 ? 2.5 / maxDim : 1.0;
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                positions[i * 3] = (positions[i * 3] - center.x) * scale;
+                positions[i * 3 + 1] = (positions[i * 3 + 1] - center.y) * scale + 0.2;
+                positions[i * 3 + 2] = (positions[i * 3 + 2] - center.z) * scale;
+            }
+            resolve(positions);
+        }, undefined, (error) => {
+            console.error('Error loading rose.glb:', error);
+            resolve(new Float32Array(PARTICLE_COUNT * 3));
+        });
+    });
+};
+const startAct2 = async () => {
+    currentAct.value = 2;
+    clearDrawingCanvas();
+    showShapeHint.value = false;
+    const explodeStart = new Float32Array(particlePositions);
+    const explodeTargets = new Float32Array(PARTICLE_COUNT * 3);
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+        explodeTargets[i * 3] = (Math.random() - 0.5) * 18;
+        explodeTargets[i * 3 + 1] = (Math.random() - 0.5) * 10;
+        explodeTargets[i * 3 + 2] = (Math.random() - 0.5) * 2.2;
+    }
+    const explodeProgress = { value: 0 };
+    await new Promise((resolve) => {
+        gsap.to(explodeProgress, {
+            value: 1,
+            duration: 0.8,
+            ease: 'power2.out',
+            onUpdate: () => {
+                const p = explodeProgress.value;
+                for (let i = 0; i < PARTICLE_COUNT; i++) {
+                    particlePositions[i * 3] = THREE.MathUtils.lerp(explodeStart[i * 3], explodeTargets[i * 3], p);
+                    particlePositions[i * 3 + 1] = THREE.MathUtils.lerp(explodeStart[i * 3 + 1], explodeTargets[i * 3 + 1], p);
+                    particlePositions[i * 3 + 2] = THREE.MathUtils.lerp(explodeStart[i * 3 + 2], explodeTargets[i * 3 + 2], p);
+                }
+                particleGeometry.attributes.position.needsUpdate = true;
+            },
+            onComplete: () => resolve()
+        });
+    });
+    const photoTargets = await samplePhotoTargets();
+    const morphStart = new Float32Array(particlePositions);
+    const morphProgress = { value: 0 };
+    // 光影肖像先以逆时针方向转正，随后定格
+    particles.rotation.z = -0.9;
+    gsap.to(particles.rotation, {
+        z: 0,
+        duration: 1.8,
+        ease: 'power2.inOut'
+    });
+    await new Promise((resolve) => {
+        gsap.to(morphProgress, {
+            value: 1,
+            duration: 1.8,
+            ease: 'power2.inOut',
+            onUpdate: () => {
+                const p = morphProgress.value;
+                for (let i = 0; i < PARTICLE_COUNT; i++) {
+                    particlePositions[i * 3] = THREE.MathUtils.lerp(morphStart[i * 3], photoTargets[i * 3], p);
+                    particlePositions[i * 3 + 1] = THREE.MathUtils.lerp(morphStart[i * 3 + 1], photoTargets[i * 3 + 1], p);
+                    particlePositions[i * 3 + 2] = THREE.MathUtils.lerp(morphStart[i * 3 + 2], photoTargets[i * 3 + 2], p);
+                }
+                particleGeometry.attributes.position.needsUpdate = true;
+            },
+            onComplete: () => resolve()
+        });
+    });
+    act2BasePositions = new Float32Array(particlePositions);
+    // 转正后停留 3 秒，让人看清光影肖像
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    // 3 秒内同步完成：粒子渐隐 + 照片显现，过渡更自然
+    gsap.to(particleMaterial, {
+        opacity: 0,
+        duration: 3,
+        ease: 'power2.inOut'
+    });
+    await new Promise(resolve => {
+        gsap.to(photoStyle.value, {
+            opacity: 1,
+            duration: 3,
+            ease: 'power2.inOut',
+            onComplete: () => resolve()
+        });
+    });
+    // 照片定格观察片刻，再进入第三幕
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    await startAct3();
+};
+/**
+ * 全局粒子颜色过渡到指定 RGB（每分量 0~1）。
+ */
+const tweenParticleColors = (target, duration) => {
+    const startColors = new Float32Array(particleColors);
+    const progress = { value: 0 };
+    return new Promise(resolve => {
+        gsap.to(progress, {
+            value: 1,
+            duration,
+            ease: 'power2.inOut',
+            onUpdate: () => {
+                const p = progress.value;
+                for (let i = 0; i < PARTICLE_COUNT; i++) {
+                    particleColors[i * 3] = THREE.MathUtils.lerp(startColors[i * 3], target[0], p);
+                    particleColors[i * 3 + 1] = THREE.MathUtils.lerp(startColors[i * 3 + 1], target[1], p);
+                    particleColors[i * 3 + 2] = THREE.MathUtils.lerp(startColors[i * 3 + 2], target[2], p);
+                }
+                ;
+                particleGeometry.attributes.color.needsUpdate = true;
+            },
+            onComplete: () => resolve()
+        });
+    });
+};
+/**
+ * HSL → RGB（H: 0~360，S/L: 0~1，返回每分量 0~1）。
+ * 内部复用 THREE.Color.setHSL 以保证色彩空间一致性。
+ */
+const _hslColorCache = new THREE.Color();
+const hslToRgb = (h, s, l) => {
+    _hslColorCache.setHSL(((h % 360) + 360) % 360 / 360, s, l);
+    return [_hslColorCache.r, _hslColorCache.g, _hslColorCache.b];
+};
+/**
+ * 基于粒子 Y 坐标生成七彩目标颜色（每粒子独立）。
+ * 色相从底部红 → 顶部紫，避免首尾相接造成色环重复。
+ */
+const buildRainbowColors = (positions) => {
+    const colors = new Float32Array(PARTICLE_COUNT * 3);
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+        const y = positions[i * 3 + 1];
+        if (y < minY)
+            minY = y;
+        if (y > maxY)
+            maxY = y;
+    }
+    const range = maxY - minY || 1;
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+        const y = positions[i * 3 + 1];
+        const t = (y - minY) / range;
+        const hue = t * 300;
+        const [r, g, b] = hslToRgb(hue, 0.85, 0.62);
+        colors[i * 3] = r;
+        colors[i * 3 + 1] = g;
+        colors[i * 3 + 2] = b;
+    }
+    return colors;
+};
+/**
+ * 粒子颜色"按粒子"过渡到目标颜色数组（每粒子独立目标 RGB）。
+ */
+const tweenParticleColorsPerParticle = (targetColors, duration) => {
+    const startColors = new Float32Array(particleColors);
+    const progress = { value: 0 };
+    return new Promise(resolve => {
+        gsap.to(progress, {
+            value: 1,
+            duration,
+            ease: 'power2.inOut',
+            onUpdate: () => {
+                const p = progress.value;
+                for (let i = 0; i < PARTICLE_COUNT; i++) {
+                    const idx = i * 3;
+                    particleColors[idx] = THREE.MathUtils.lerp(startColors[idx], targetColors[idx], p);
+                    particleColors[idx + 1] = THREE.MathUtils.lerp(startColors[idx + 1], targetColors[idx + 1], p);
+                    particleColors[idx + 2] = THREE.MathUtils.lerp(startColors[idx + 2], targetColors[idx + 2], p);
+                }
+                ;
+                particleGeometry.attributes.color.needsUpdate = true;
+            },
+            onComplete: () => resolve()
+        });
+    });
+};
+const startAct3 = async () => {
+    currentAct.value = 3;
+    act2BasePositions = null;
+    // 计算信封目标位置
+    const { positions: envPositions, kinds } = computeEnvelopePositions();
+    envelopeKindArr = kinds;
+    const morphStart = new Float32Array(particlePositions);
+    const morphProgress = { value: 0 };
+    // 粒子重新显现（与照片同步淡出）
+    gsap.to(particleMaterial, {
+        opacity: 0.86,
+        duration: 1.4,
+        ease: 'power2.inOut'
+    });
+    gsap.to(photoStyle.value, {
+        opacity: 0,
+        duration: 1.4,
+        ease: 'power2.inOut'
+    });
+    // 颜色过渡到暖金色（不阻塞）
+    tweenParticleColors([1.0, 0.88, 0.6], 1.6);
+    // 流沙式下坠：每个粒子带轻微随机延时，让动画更像沙子流动
+    await new Promise(resolve => {
+        gsap.to(morphProgress, {
+            value: 1,
+            duration: 1.8,
+            ease: 'power2.in',
+            onUpdate: () => {
+                const p = morphProgress.value;
+                for (let i = 0; i < PARTICLE_COUNT; i++) {
+                    // 让粒子越靠上、越晚开始下落
+                    const delay = (morphStart[i * 3 + 1] + 4) / 8 * 0.2;
+                    const adjusted = THREE.MathUtils.clamp((p - delay) / (1 - delay), 0, 1);
+                    const ease = adjusted * adjusted * (3 - 2 * adjusted);
+                    particlePositions[i * 3] = THREE.MathUtils.lerp(morphStart[i * 3], envPositions[i * 3], ease);
+                    particlePositions[i * 3 + 1] = THREE.MathUtils.lerp(morphStart[i * 3 + 1], envPositions[i * 3 + 1], ease);
+                    particlePositions[i * 3 + 2] = THREE.MathUtils.lerp(morphStart[i * 3 + 2], envPositions[i * 3 + 2], ease);
+                }
+                particleGeometry.attributes.position.needsUpdate = true;
+            },
+            onComplete: () => resolve()
+        });
+    });
+    // 信封成形，停留片刻后浮现提示
+    await new Promise(resolve => setTimeout(resolve, 600));
+    showEnvelopeHint.value = true;
+};
+const typeLine = (lineIdx, text, charDelay = 90) => new Promise(resolve => {
+    let i = 0;
+    const tick = () => {
+        i += 1;
+        typedLines.value[lineIdx] = text.slice(0, i);
+        typedLines.value = [...typedLines.value];
+        nextTick(() => {
+            if (letterCardRef.value) {
+                letterCardRef.value.scrollTop = letterCardRef.value.scrollHeight;
+            }
+        });
+        if (i < text.length) {
+            setTimeout(tick, charDelay);
+        }
+        else {
+            resolve();
+        }
+    };
+    tick();
+});
+const openEnvelope = async () => {
+    if (isEnvelopeOpening.value || currentAct.value !== 3)
+        return;
+    if (!envelopeKindArr)
+        return;
+    isEnvelopeOpening.value = true;
+    showEnvelopeHint.value = false;
+    // 封口三角粒子向上散开（kind === 2）
+    const flapStart = new Float32Array(PARTICLE_COUNT * 3);
+    const flapTarget = new Float32Array(PARTICLE_COUNT * 3);
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+        flapStart[i * 3] = particlePositions[i * 3];
+        flapStart[i * 3 + 1] = particlePositions[i * 3 + 1];
+        flapStart[i * 3 + 2] = particlePositions[i * 3 + 2];
+        if (envelopeKindArr[i] === 2) {
+            flapTarget[i * 3] = particlePositions[i * 3] + (Math.random() - 0.5) * 1.6;
+            flapTarget[i * 3 + 1] = particlePositions[i * 3 + 1] + 0.6 + Math.random() * 0.8;
+            flapTarget[i * 3 + 2] = particlePositions[i * 3 + 2] + (Math.random() - 0.2) * 0.6;
+        }
+        else {
+            flapTarget[i * 3] = particlePositions[i * 3];
+            flapTarget[i * 3 + 1] = particlePositions[i * 3 + 1];
+            flapTarget[i * 3 + 2] = particlePositions[i * 3 + 2];
+        }
+    }
+    const flapProgress = { value: 0 };
+    await new Promise(resolve => {
+        gsap.to(flapProgress, {
+            value: 1,
+            duration: 0.6,
+            ease: 'power2.out',
+            onUpdate: () => {
+                const p = flapProgress.value;
+                for (let i = 0; i < PARTICLE_COUNT; i++) {
+                    if (envelopeKindArr[i] === 2) {
+                        particlePositions[i * 3] = THREE.MathUtils.lerp(flapStart[i * 3], flapTarget[i * 3], p);
+                        particlePositions[i * 3 + 1] = THREE.MathUtils.lerp(flapStart[i * 3 + 1], flapTarget[i * 3 + 1], p);
+                        particlePositions[i * 3 + 2] = THREE.MathUtils.lerp(flapStart[i * 3 + 2], flapTarget[i * 3 + 2], p);
+                    }
+                }
+                particleGeometry.attributes.position.needsUpdate = true;
+            },
+            onComplete: () => resolve()
+        });
+    });
+    // 信纸浮层淡入
+    showLetterOverlay.value = true;
+    await new Promise(resolve => setTimeout(resolve, 700));
+    // 逐段打字机
+    for (let i = 0; i < CONFESSION_LINES.length; i++) {
+        await typeLine(i, CONFESSION_LINES[i], 55);
+        await new Promise(resolve => setTimeout(resolve, 280));
+    }
+    // 等待用户手动点击继续
+    isTypingFinished.value = true;
+};
+const closeLetterAndContinue = async () => {
+    if (!isTypingFinished.value)
+        return;
+    isTypingFinished.value = false;
+    showLetterOverlay.value = false;
+    showEnvelopeHint.value = false;
+    await new Promise(resolve => setTimeout(resolve, 600));
+    await startAct4();
+};
+const startAct4 = async () => {
+    currentAct.value = 4;
+    showEnvelopeHint.value = false;
+    envelopeKindArr = null;
+    // 先导粒子：从信封中心螺旋升起
+    const guideGeometry = new THREE.SphereGeometry(0.04, 16, 16);
+    const guideMaterial = new THREE.MeshBasicMaterial({
+        color: 0xfff1c4,
+        transparent: true,
+        opacity: 1
+    });
+    const guide = new THREE.Mesh(guideGeometry, guideMaterial);
+    guide.position.set(0, -0.25, 0.1);
+    scene.add(guide);
+    const guideAnim = { t: 0 };
+    gsap.to(guideAnim, {
+        t: 1,
+        duration: 1.4,
+        ease: 'power2.out',
+        onUpdate: () => {
+            const t = guideAnim.t;
+            const angle = t * Math.PI * 5;
+            const radius = 0.45 * (1 - t * 0.6);
+            guide.position.x = Math.cos(angle) * radius;
+            guide.position.y = -0.25 + t * 0.65;
+            guide.position.z = Math.sin(angle) * radius * 0.6 + 0.1;
+        },
+        onComplete: () => {
+            gsap.to(guideMaterial, {
+                opacity: 0,
+                duration: 0.4,
+                onComplete: () => {
+                    scene.remove(guide);
+                    guideGeometry.dispose();
+                    guideMaterial.dispose();
+                }
+            });
+        }
+    });
+    // 同步进行：粒子颜色由暖金过渡到浅白（汇聚成形的纯净感），稍后再绽放为七彩
+    tweenParticleColors([1.0, 0.95, 0.9], 1.8);
+    // 计算玫瑰目标
+    const roseTargetsLocal = await loadRoseModelTargets();
+    roseTargets = roseTargetsLocal;
+    const morphStart = new Float32Array(particlePositions);
+    const morphProgress = { value: 0 };
+    // 让 morph 在视觉上像"螺旋汇流"：基于角度施加延时
+    await new Promise(resolve => {
+        gsap.to(morphProgress, {
+            value: 1,
+            duration: 2.0,
+            ease: 'power2.inOut',
+            onUpdate: () => {
+                const p = morphProgress.value;
+                for (let i = 0; i < PARTICLE_COUNT; i++) {
+                    const angle = Math.atan2(morphStart[i * 3 + 1] + 0.25, morphStart[i * 3]);
+                    const delay = ((angle + Math.PI) / (2 * Math.PI)) * 0.25;
+                    const adjusted = THREE.MathUtils.clamp((p - delay) / (1 - delay), 0, 1);
+                    const ease = adjusted * adjusted * (3 - 2 * adjusted);
+                    // 路径中途加入轻微的螺旋扰动
+                    const swirl = Math.sin(ease * Math.PI) * 0.08;
+                    const cosS = Math.cos(swirl);
+                    const sinS = Math.sin(swirl);
+                    const lx = THREE.MathUtils.lerp(morphStart[i * 3], roseTargetsLocal[i * 3], ease);
+                    const ly = THREE.MathUtils.lerp(morphStart[i * 3 + 1], roseTargetsLocal[i * 3 + 1], ease);
+                    const lz = THREE.MathUtils.lerp(morphStart[i * 3 + 2], roseTargetsLocal[i * 3 + 2], ease);
+                    particlePositions[i * 3] = lx * cosS - lz * sinS;
+                    particlePositions[i * 3 + 1] = ly;
+                    particlePositions[i * 3 + 2] = lx * sinS + lz * cosS;
+                }
+                particleGeometry.attributes.position.needsUpdate = true;
+            },
+            onComplete: () => resolve()
+        });
+    });
+    // 玫瑰稳定后：调亮一些以表现"绽放"
+    gsap.to(particleMaterial, {
+        opacity: 0.95,
+        size: 0.04,
+        duration: 0.8,
+        ease: 'power2.out'
+    });
+    // 七彩绽放：基于粒子最终位置（Y 轴）映射七彩，平滑过渡
+    tweenParticleColorsPerParticle(buildRainbowColors(roseTargetsLocal), 1.5);
+    // 背景烟花助兴：默认发射 3 秒，已升空的烟花炸完后再停
+    const instance = ensureFireworks();
+    if (instance && !instance.isRunning) {
+        instance.start();
+        fireworksOn.value = true;
+        scheduleFireworksLaunchWindow();
+    }
+    showFireworksBtn.value = true;
+    // 延迟显示保存按钮
+    setTimeout(() => {
+        showSaveBtn.value = true;
+    }, 2000);
+    emit('act1Complete');
+};
+const handleBackToPlanet = () => {
+    if (currentAct.value !== 4)
+        return;
+    stopFireworksImmediately(true);
+    emit('backToPlanet');
+};
+const triggerRoseHaptic = () => {
+    if (currentAct.value !== 4)
+        return;
+    if ('vibrate' in navigator) {
+        try {
+            navigator.vibrate(50);
+        }
+        catch {
+            // ignore
+        }
+    }
+};
+const handleSavePoster = async () => {
+    if (!renderer || !containerRef.value)
+        return;
+    const w = containerRef.value.clientWidth;
+    const h = containerRef.value.clientHeight;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const out = document.createElement('canvas');
+    out.width = w * dpr;
+    out.height = h * dpr;
+    const ctx = out.getContext('2d');
+    if (!ctx)
+        return;
+    // 统一按设备像素比缩放上下文，后续坐标均按逻辑像素(w, h)计算
+    ctx.scale(dpr, dpr);
+    // 背景：与场景同色，避免黑底硬边
+    ctx.fillStyle = '#000010';
+    ctx.fillRect(0, 0, w, h);
+    // 渲染当前 WebGL 帧到 2D 画布
+    renderer.render(scene, camera);
+    ctx.drawImage(renderer.domElement, 0, 0, w, h);
+    // 角落叠加她手绘的爱心（她创作的印记）
+    if (heartSnapshot) {
+        const targetW = Math.min(180, w * 0.22);
+        const ratio = heartSnapshot.height / heartSnapshot.width;
+        const targetH = targetW * ratio;
+        const margin = Math.max(20, Math.floor(w * 0.035));
+        ctx.save();
+        ctx.globalAlpha = 0.78;
+        ctx.drawImage(heartSnapshot, w - targetW - margin, margin, targetW, targetH);
+        ctx.restore();
+        // 给爱心配一个克制的小标签
+        ctx.save();
+        ctx.textAlign = 'right';
+        ctx.fillStyle = 'rgba(255, 220, 230, 0.65)';
+        // 使用更高清的字体
+        ctx.font = `${Math.max(11, Math.floor(w * 0.012))}px "PingFang SC", "Microsoft YaHei", serif`;
+        ctx.fillText('— 由你亲手画下', w - margin, margin + targetH + 18);
+        ctx.restore();
+    }
+    // 动态生成信纸卡片的离线 DOM 并绘制到图片左侧
+    const letterDiv = document.createElement('div');
+    letterDiv.innerHTML = `
+    <div style="
+      width: 480px;
+      padding: 2.5rem 2.2rem;
+      border-radius: 20px;
+      background: linear-gradient(155deg, rgba(252, 244, 228, 0.96), rgba(244, 228, 208, 0.92));
+      color: #5a3a2a;
+      border: 1.5px solid rgba(255, 220, 180, 0.4);
+      font-family: 'KaiTi', 'STKaiti', 'PingFang SC', serif;
+      box-sizing: border-box;
+    ">
+      <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 1.6rem;">
+        <span style="flex: 1; height: 1.5px; background: linear-gradient(90deg, transparent, rgba(140, 90, 50, 0.4), transparent);"></span>
+        <span style="font-size: 0.95rem; letter-spacing: 0.3em; color: rgba(140, 90, 50, 0.85); font-family: sans-serif; font-weight: bold;">致 咏欣</span>
+        <span style="flex: 1; height: 1.5px; background: linear-gradient(90deg, transparent, rgba(140, 90, 50, 0.4), transparent);"></span>
+      </div>
+      <div style="font-size: 1.15rem; line-height: 1.9; letter-spacing: 0.06em;">
+        ${CONFESSION_LINES.map(line => `<p style="margin: 0 0 0.5em 0;">${line}</p>`).join('')}
+      </div>
+      <div style="margin-top: 1.8rem; text-align: right; font-size: 0.95rem; letter-spacing: 0.08em; color: rgba(140, 90, 50, 0.7); font-family: sans-serif; font-weight: bold;">
+        <p style="margin: 0.2em 0;">永远偏向你的</p>
+        <p style="margin: 0.2em 0;">陈垂青</p>
+        <p style="margin: 0.2em 0;">2026年5月17日</p>
+      </div>
+    </div>
+  `;
+    letterDiv.style.position = 'fixed';
+    letterDiv.style.left = '-9999px';
+    letterDiv.style.top = '0';
+    document.body.appendChild(letterDiv);
+    try {
+        const letterCanvas = await html2canvas(letterDiv.firstElementChild, {
+            backgroundColor: 'transparent',
+            scale: 3 // 设置更大的缩放倍数以保证文字高清
+        });
+        // 计算缩放与位置，让它显示在屏幕左侧
+        const isLandscape = w > h;
+        const maxLetterH = h * 0.85;
+        const maxLetterW = isLandscape ? Math.max(300, w * 0.38) : w * 0.85;
+        const letterRatio = letterCanvas.height / letterCanvas.width;
+        let targetW = maxLetterW;
+        let targetH = targetW * letterRatio;
+        if (targetH > maxLetterH) {
+            targetH = maxLetterH;
+            targetW = targetH / letterRatio;
+        }
+        const drawX = isLandscape ? Math.max(30, w * 0.05) : (w - targetW) / 2;
+        const drawY = (h - targetH) / 2;
+        ctx.save();
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+        ctx.shadowBlur = 40;
+        ctx.shadowOffsetY = 16;
+        ctx.drawImage(letterCanvas, drawX, drawY, targetW, targetH);
+        ctx.restore();
+    }
+    catch (e) {
+        console.error('Failed to capture letter poster:', e);
+    }
+    finally {
+        document.body.removeChild(letterDiv);
+    }
+    const link = document.createElement('a');
+    link.download = 'love-letter.png';
+    link.href = out.toDataURL('image/png', 1.0);
+    link.click();
+};
+/**
+ * 在塌缩开始时把用户手绘爱心的笔触快照保存下来，
+ * 供第四幕"留住这一刻"合成海报时使用。
+ */
+const snapshotHeartTrace = () => {
+    if (!drawingCanvasRef.value)
+        return;
+    const cw = drawingCanvasRef.value.width;
+    const ch = drawingCanvasRef.value.height;
+    const screenPoints = traceScreenPoints.length >= 2
+        ? traceScreenPoints
+        : pathPoints.length >= 2
+            ? pathPoints.map((p) => {
+                const v = new THREE.Vector3(p.x, p.y, 0);
+                v.project(camera);
+                return {
+                    x: ((v.x + 1) / 2) * cw,
+                    y: ((-v.y + 1) / 2) * ch
+                };
+            })
+            : [];
+    if (screenPoints.length < 2)
+        return;
+    const strokeStartSet = new Set(traceStrokeStarts);
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const p of screenPoints) {
+        if (p.x < minX)
+            minX = p.x;
+        if (p.y < minY)
+            minY = p.y;
+        if (p.x > maxX)
+            maxX = p.x;
+        if (p.y > maxY)
+            maxY = p.y;
+    }
+    const padding = 36;
+    const bw = Math.max(1, Math.ceil(maxX - minX + padding * 2));
+    const bh = Math.max(1, Math.ceil(maxY - minY + padding * 2));
+    const snap = document.createElement('canvas');
+    snap.width = bw;
+    snap.height = bh;
+    const ctx = snap.getContext('2d');
+    if (!ctx)
+        return;
+    const minSpan = Math.min(bw, bh);
+    const maxJoinSq = Math.pow(minSpan * 0.14, 2);
+    // 用与绘制时一致的笔触样式重画，保留她笔下的发光质感
+    ctx.strokeStyle = 'rgba(255, 211, 236, 0.95)';
+    ctx.lineWidth = 3.2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.shadowBlur = 14;
+    ctx.shadowColor = 'rgba(255, 108, 176, 0.85)';
+    ctx.beginPath();
+    for (let i = 0; i < screenPoints.length; i++) {
+        const x = screenPoints[i].x - minX + padding;
+        const y = screenPoints[i].y - minY + padding;
+        let useMove = i === 0 || strokeStartSet.has(i);
+        if (!useMove && i > 0) {
+            const px = screenPoints[i - 1].x - minX + padding;
+            const py = screenPoints[i - 1].y - minY + padding;
+            const dsq = (x - px) * (x - px) + (y - py) * (y - py);
+            if (dsq > maxJoinSq)
+                useMove = true;
+        }
+        if (useMove)
+            ctx.moveTo(x, y);
+        else
+            ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    heartSnapshot = snap;
+};
+const animateHeartCollapse = () => {
+    if (isCollapsing.value || highlightedIndices.size === 0)
+        return;
+    isCollapsing.value = true;
+    snapshotHeartTrace();
+    const indices = Array.from(highlightedIndices);
+    const start = new Float32Array(indices.length * 3);
+    let cx = 0;
+    let cy = 0;
+    let cz = 0;
+    indices.forEach((idx, index) => {
+        const x = particlePositions[idx * 3];
+        const y = particlePositions[idx * 3 + 1];
+        const z = particlePositions[idx * 3 + 2];
+        start[index * 3] = x;
+        start[index * 3 + 1] = y;
+        start[index * 3 + 2] = z;
+        cx += x;
+        cy += y;
+        cz += z;
+    });
+    cx /= indices.length;
+    cy /= indices.length;
+    cz /= indices.length;
+    const progress = { value: 0 };
+    gsap.to(progress, {
+        value: 1,
+        duration: 1.2,
+        ease: 'power3.in',
+        onUpdate: () => {
+            const p = progress.value;
+            indices.forEach((idx, index) => {
+                particlePositions[idx * 3] = THREE.MathUtils.lerp(start[index * 3], cx, p);
+                particlePositions[idx * 3 + 1] = THREE.MathUtils.lerp(start[index * 3 + 1], cy, p);
+                particlePositions[idx * 3 + 2] = THREE.MathUtils.lerp(start[index * 3 + 2], cz, p);
+            });
+            particleGeometry.attributes.position.needsUpdate = true;
+            particleMaterial.opacity = 0.86 + p * 0.14;
+        },
+        onComplete: async () => {
+            await startAct2();
+        }
+    });
+};
+const clearDrawingCanvas = () => {
+    const canvas = drawingCanvasRef.value;
+    if (!canvas)
+        return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx)
+        return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // 当阶段在 1 时，重绘底图
+    if (currentAct.value === 1) {
+        drawHeartOutline();
+    }
+};
+const resetDrawing = () => {
+    if (isCollapsing.value && currentAct.value === 1)
+        return;
+    pathPoints.length = 0;
+    traceScreenPoints.length = 0;
+    traceStrokeStarts.length = 0;
+    highlightedIndices.clear();
+    hasInteracted.value = false;
+    firstPathPoint = null;
+    showShapeHint.value = false;
+    isCollapsing.value = false;
+    currentAct.value = 1;
+    act2BasePositions = null;
+    act2BreathingTime = 0;
+    act4BreathingTime = 0;
+    envelopeKindArr = null;
+    roseTargets = null;
+    heartSnapshot = null;
+    showEnvelopeHint.value = false;
+    showLetterOverlay.value = false;
+    showSaveBtn.value = false;
+    isEnvelopeOpening.value = false;
+    isTypingFinished.value = false;
+    typedLines.value = CONFESSION_LINES.map(() => '');
+    act4RotateState.isDragging = false;
+    act4RotateState.velocityX = 0;
+    act4RotateState.velocityY = 0;
+    clearDrawingCanvas();
+    gsap.killTweensOf(particleMaterial);
+    if (particleMaterial) {
+        particleMaterial.opacity = 0.86;
+        particleMaterial.size = 0.035;
+    }
+    gsap.killTweensOf(photoStyle.value);
+    photoStyle.value.opacity = 0;
+    // 颜色复位为银白
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+        particleColors[i * 3] = 0.88 + Math.random() * 0.12;
+        particleColors[i * 3 + 1] = 0.9 + Math.random() * 0.1;
+        particleColors[i * 3 + 2] = 1;
+    }
+    ;
+    particleGeometry.attributes.color.needsUpdate = true;
+    particles.rotation.set(0, 0, 0);
+    const progress = { value: 0 };
+    const startPositions = new Float32Array(particlePositions);
+    gsap.to(progress, {
+        value: 1,
+        duration: 0.9,
+        ease: 'power2.out',
+        onUpdate: () => {
+            const p = progress.value;
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                particlePositions[i * 3] = THREE.MathUtils.lerp(startPositions[i * 3], basePositions[i * 3], p);
+                particlePositions[i * 3 + 1] = THREE.MathUtils.lerp(startPositions[i * 3 + 1], basePositions[i * 3 + 1], p);
+                particlePositions[i * 3 + 2] = THREE.MathUtils.lerp(startPositions[i * 3 + 2], basePositions[i * 3 + 2], p);
+            }
+            particleGeometry.attributes.position.needsUpdate = true;
+        }
+    });
+};
+const handlePointerDown = (event) => {
+    if (currentAct.value === 1) {
+        if (isCollapsing.value)
+            return;
+        pointerState.isDrawing = true;
+        hasInteracted.value = true;
+        showShapeHint.value = false;
+        const rect = containerRef.value.getBoundingClientRect();
+        traceStrokeStarts.push(traceScreenPoints.length);
+        traceScreenPoints.push({
+            x: event.clientX - rect.left,
+            y: event.clientY - rect.top
+        });
+        const world = screenToWorld(event.clientX, event.clientY);
+        if (!firstPathPoint) {
+            firstPathPoint = new THREE.Vector2(world.x, world.y);
+        }
+        pathPoints.push(new THREE.Vector2(world.x, world.y));
+        attractParticlesToPoint(world);
+        return;
+    }
+    if (currentAct.value === 3 && !isEnvelopeOpening.value && !showLetterOverlay.value) {
+        envelopeTouchState.startX = event.clientX;
+        envelopeTouchState.startY = event.clientY;
+        envelopeTouchState.startTime = Date.now();
+        envelopeTouchState.active = true;
+        return;
+    }
+    if (currentAct.value === 4) {
+        act4RotateState.isDragging = true;
+        act4RotateState.lastX = event.clientX;
+        act4RotateState.lastY = event.clientY;
+        act4RotateState.velocityX = 0;
+        act4RotateState.velocityY = 0;
+    }
+};
+const handlePointerMove = (event) => {
+    if (currentAct.value === 1) {
+        if (!pointerState.isDrawing || isCollapsing.value)
+            return;
+        const previousEvent = handlePointerMove.prev;
+        if (previousEvent) {
+            drawTrailSegment(previousEvent, event);
+        }
+        ;
+        handlePointerMove.prev = event;
+        const rect = containerRef.value.getBoundingClientRect();
+        traceScreenPoints.push({
+            x: event.clientX - rect.left,
+            y: event.clientY - rect.top
+        });
+        const world = screenToWorld(event.clientX, event.clientY);
+        pathPoints.push(new THREE.Vector2(world.x, world.y));
+        attractParticlesToPoint(world);
+        return;
+    }
+    if (currentAct.value === 4 && act4RotateState.isDragging) {
+        const dx = event.clientX - act4RotateState.lastX;
+        const dy = event.clientY - act4RotateState.lastY;
+        const rotY = dx * 0.005;
+        const rotX = dy * 0.005;
+        particles.rotation.y += rotY;
+        particles.rotation.x = THREE.MathUtils.clamp(particles.rotation.x + rotX, -0.9, 0.9);
+        act4RotateState.velocityX = rotY;
+        act4RotateState.velocityY = rotX;
+        act4RotateState.lastX = event.clientX;
+        act4RotateState.lastY = event.clientY;
+    }
+};
+const handlePointerUp = (event) => {
+    if (currentAct.value === 1) {
+        if (!pointerState.isDrawing)
+            return;
+        pointerState.isDrawing = false;
+        handlePointerMove.prev = undefined;
+        if (isHeartRecognized()) {
+            animateHeartCollapse();
+        }
+        else if (pathPoints.length >= 15) {
+            showHintTemporarily();
+        }
+        return;
+    }
+    if (currentAct.value === 3 && envelopeTouchState.active) {
+        envelopeTouchState.active = false;
+        const dx = event.clientX - envelopeTouchState.startX;
+        const dy = event.clientY - envelopeTouchState.startY;
+        const dt = Date.now() - envelopeTouchState.startTime;
+        const distance = Math.hypot(dx, dy);
+        const isSwipeUp = dy < -30 && Math.abs(dy) > Math.abs(dx);
+        const isTap = distance < 12 && dt < 350;
+        if (isSwipeUp || isTap) {
+            openEnvelope();
+        }
+        return;
+    }
+    if (currentAct.value === 4 && act4RotateState.isDragging) {
+        act4RotateState.isDragging = false;
+        const dx = event.clientX - act4RotateState.lastX;
+        const dy = event.clientY - act4RotateState.lastY;
+        const distance = Math.hypot(dx, dy);
+        // 小幅滑动视为点击 → 触发触觉反馈
+        if (distance < 6) {
+            triggerRoseHaptic();
+        }
+    }
+};
+const handleResize = () => {
+    if (!containerRef.value)
+        return;
+    camera.aspect = containerRef.value.clientWidth / containerRef.value.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(containerRef.value.clientWidth, containerRef.value.clientHeight);
+    resizeDrawingCanvas();
+};
+onMounted(() => {
+    initScene();
+    resizeDrawingCanvas();
+    animate();
+    window.addEventListener('resize', handleResize);
+});
+onUnmounted(() => {
+    cancelAnimationFrame(animationId);
+    window.removeEventListener('resize', handleResize);
+    if (shapeHintTimer)
+        clearTimeout(shapeHintTimer);
+    stopFireworksImmediately(true);
+    fireworksInstance = null;
+    if (renderer) {
+        renderer.dispose();
+    }
+    if (particleGeometry) {
+        particleGeometry.dispose();
+    }
+    if (particleMaterial) {
+        particleMaterial.dispose();
+    }
+});
+const __VLS_ctx = {
+    ...{},
+    ...{},
+    ...{},
+    ...{},
+    ...{},
+};
+let __VLS_components;
+let __VLS_intrinsics;
+let __VLS_directives;
+/** @type {__VLS_StyleScopedClasses['reset-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['letter-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['letter-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['letter-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['letter-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['letter-footer']} */ ;
+/** @type {__VLS_StyleScopedClasses['continue-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['save-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['back-planet-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['fireworks-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['fireworks-btn']} */ ;
+__VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+    ...{ onPointerdown: (__VLS_ctx.handlePointerDown) },
+    ...{ onPointermove: (__VLS_ctx.handlePointerMove) },
+    ...{ onPointerup: (__VLS_ctx.handlePointerUp) },
+    ...{ onPointerleave: (__VLS_ctx.handlePointerUp) },
+    ref: "containerRef",
+    ...{ class: "phase-three" },
+});
+/** @type {__VLS_StyleScopedClasses['phase-three']} */ ;
+__VLS_asFunctionalElement1(__VLS_intrinsics.canvas)({
+    ref: "drawingCanvasRef",
+    ...{ class: "drawing-layer" },
+});
+__VLS_asFunctionalDirective(__VLS_directives.vShow, {})(null, { ...__VLS_directiveBindingRestFields, value: (__VLS_ctx.currentAct === 1) }, null, null);
+/** @type {__VLS_StyleScopedClasses['drawing-layer']} */ ;
+__VLS_asFunctionalElement1(__VLS_intrinsics.canvas)({
+    ref: "fireworksCanvas",
+    ...{ class: "fireworks-canvas" },
+});
+/** @type {__VLS_StyleScopedClasses['fireworks-canvas']} */ ;
+__VLS_asFunctionalElement1(__VLS_intrinsics.img)({
+    ref: "photoRef",
+    src: (__VLS_ctx.PHOTO_URL),
+    ...{ class: "photo-frame" },
+    ...{ style: (__VLS_ctx.photoStyle) },
+    alt: "",
+});
+/** @type {__VLS_StyleScopedClasses['photo-frame']} */ ;
+let __VLS_0;
+/** @ts-ignore @type { | typeof __VLS_components.Transition | typeof __VLS_components.Transition} */
+Transition;
+// @ts-ignore
+const __VLS_1 = __VLS_asFunctionalComponent1(__VLS_0, new __VLS_0({
+    enterActiveClass: "transition-opacity duration-500",
+    leaveActiveClass: "transition-opacity duration-500",
+    enterFromClass: "opacity-0",
+    leaveToClass: "opacity-0",
+}));
+const __VLS_2 = __VLS_1({
+    enterActiveClass: "transition-opacity duration-500",
+    leaveActiveClass: "transition-opacity duration-500",
+    enterFromClass: "opacity-0",
+    leaveToClass: "opacity-0",
+}, ...__VLS_functionalComponentArgsRest(__VLS_1));
+const { default: __VLS_5 } = __VLS_3.slots;
+if (!__VLS_ctx.hasInteracted && __VLS_ctx.currentAct === 1) {
+    __VLS_asFunctionalElement1(__VLS_intrinsics.p, __VLS_intrinsics.p)({
+        ...{ class: "draw-hint" },
+    });
+    /** @type {__VLS_StyleScopedClasses['draw-hint']} */ ;
+}
+// @ts-ignore
+[handlePointerDown, handlePointerMove, handlePointerUp, handlePointerUp, currentAct, currentAct, PHOTO_URL, photoStyle, hasInteracted,];
+var __VLS_3;
+let __VLS_6;
+/** @ts-ignore @type { | typeof __VLS_components.Transition | typeof __VLS_components.Transition} */
+Transition;
+// @ts-ignore
+const __VLS_7 = __VLS_asFunctionalComponent1(__VLS_6, new __VLS_6({
+    enterActiveClass: "transition-opacity duration-300",
+    leaveActiveClass: "transition-opacity duration-300",
+    enterFromClass: "opacity-0",
+    leaveToClass: "opacity-0",
+}));
+const __VLS_8 = __VLS_7({
+    enterActiveClass: "transition-opacity duration-300",
+    leaveActiveClass: "transition-opacity duration-300",
+    enterFromClass: "opacity-0",
+    leaveToClass: "opacity-0",
+}, ...__VLS_functionalComponentArgsRest(__VLS_7));
+const { default: __VLS_11 } = __VLS_9.slots;
+if (__VLS_ctx.showShapeHint) {
+    __VLS_asFunctionalElement1(__VLS_intrinsics.p, __VLS_intrinsics.p)({
+        ...{ class: "shape-hint" },
+    });
+    /** @type {__VLS_StyleScopedClasses['shape-hint']} */ ;
+}
+// @ts-ignore
+[showShapeHint,];
+var __VLS_9;
+let __VLS_12;
+/** @ts-ignore @type { | typeof __VLS_components.Transition | typeof __VLS_components.Transition} */
+Transition;
+// @ts-ignore
+const __VLS_13 = __VLS_asFunctionalComponent1(__VLS_12, new __VLS_12({
+    enterActiveClass: "transition-opacity duration-700",
+    leaveActiveClass: "transition-opacity duration-500",
+    enterFromClass: "opacity-0",
+    leaveToClass: "opacity-0",
+}));
+const __VLS_14 = __VLS_13({
+    enterActiveClass: "transition-opacity duration-700",
+    leaveActiveClass: "transition-opacity duration-500",
+    enterFromClass: "opacity-0",
+    leaveToClass: "opacity-0",
+}, ...__VLS_functionalComponentArgsRest(__VLS_13));
+const { default: __VLS_17 } = __VLS_15.slots;
+if (__VLS_ctx.currentAct === 3 && __VLS_ctx.showEnvelopeHint && !__VLS_ctx.showLetterOverlay) {
+    __VLS_asFunctionalElement1(__VLS_intrinsics.p, __VLS_intrinsics.p)({
+        ...{ class: "envelope-hint" },
+    });
+    /** @type {__VLS_StyleScopedClasses['envelope-hint']} */ ;
+}
+// @ts-ignore
+[currentAct, showEnvelopeHint, showLetterOverlay,];
+var __VLS_15;
+let __VLS_18;
+/** @ts-ignore @type { | typeof __VLS_components.Transition | typeof __VLS_components.Transition} */
+Transition;
+// @ts-ignore
+const __VLS_19 = __VLS_asFunctionalComponent1(__VLS_18, new __VLS_18({
+    enterActiveClass: "transition-opacity duration-700",
+    leaveActiveClass: "transition-opacity duration-500",
+    enterFromClass: "opacity-0",
+    leaveToClass: "opacity-0",
+}));
+const __VLS_20 = __VLS_19({
+    enterActiveClass: "transition-opacity duration-700",
+    leaveActiveClass: "transition-opacity duration-500",
+    enterFromClass: "opacity-0",
+    leaveToClass: "opacity-0",
+}, ...__VLS_functionalComponentArgsRest(__VLS_19));
+const { default: __VLS_23 } = __VLS_21.slots;
+if (__VLS_ctx.showLetterOverlay) {
+    __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+        ...{ class: "letter-overlay" },
+    });
+    /** @type {__VLS_StyleScopedClasses['letter-overlay']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+        ...{ class: "letter-card" },
+        ref: "letterCardRef",
+    });
+    /** @type {__VLS_StyleScopedClasses['letter-card']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+        ...{ class: "letter-header" },
+    });
+    /** @type {__VLS_StyleScopedClasses['letter-header']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({
+        ...{ class: "letter-line" },
+    });
+    /** @type {__VLS_StyleScopedClasses['letter-line']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({
+        ...{ class: "letter-date" },
+    });
+    /** @type {__VLS_StyleScopedClasses['letter-date']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({
+        ...{ class: "letter-line" },
+    });
+    /** @type {__VLS_StyleScopedClasses['letter-line']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+        ...{ class: "letter-text" },
+    });
+    /** @type {__VLS_StyleScopedClasses['letter-text']} */ ;
+    for (const [line, i] of __VLS_vFor((__VLS_ctx.typedLines))) {
+        __VLS_asFunctionalElement1(__VLS_intrinsics.p, __VLS_intrinsics.p)({
+            key: (i),
+            ...{ class: "letter-paragraph" },
+        });
+        /** @type {__VLS_StyleScopedClasses['letter-paragraph']} */ ;
+        (line);
+        if (line && i === __VLS_ctx.typedLines.length - 1) {
+            __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({
+                ...{ class: "cursor" },
+            });
+            /** @type {__VLS_StyleScopedClasses['cursor']} */ ;
+        }
+        // @ts-ignore
+        [showLetterOverlay, typedLines, typedLines,];
+    }
+    if (__VLS_ctx.isTypingFinished) {
+        __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+            ...{ class: "letter-footer" },
+        });
+        /** @type {__VLS_StyleScopedClasses['letter-footer']} */ ;
+        __VLS_asFunctionalElement1(__VLS_intrinsics.p, __VLS_intrinsics.p)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.p, __VLS_intrinsics.p)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.p, __VLS_intrinsics.p)({});
+    }
+}
+// @ts-ignore
+[isTypingFinished,];
+var __VLS_21;
+let __VLS_24;
+/** @ts-ignore @type { | typeof __VLS_components.Transition | typeof __VLS_components.Transition} */
+Transition;
+// @ts-ignore
+const __VLS_25 = __VLS_asFunctionalComponent1(__VLS_24, new __VLS_24({
+    enterActiveClass: "transition-opacity duration-700",
+    leaveActiveClass: "transition-opacity duration-300",
+    enterFromClass: "opacity-0",
+    leaveToClass: "opacity-0",
+}));
+const __VLS_26 = __VLS_25({
+    enterActiveClass: "transition-opacity duration-700",
+    leaveActiveClass: "transition-opacity duration-300",
+    enterFromClass: "opacity-0",
+    leaveToClass: "opacity-0",
+}, ...__VLS_functionalComponentArgsRest(__VLS_25));
+const { default: __VLS_29 } = __VLS_27.slots;
+if (__VLS_ctx.showLetterOverlay && __VLS_ctx.isTypingFinished) {
+    __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+        ...{ class: "continue-action" },
+    });
+    /** @type {__VLS_StyleScopedClasses['continue-action']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+        ...{ onClick: (__VLS_ctx.closeLetterAndContinue) },
+        ...{ class: "continue-btn" },
+    });
+    /** @type {__VLS_StyleScopedClasses['continue-btn']} */ ;
+}
+// @ts-ignore
+[showLetterOverlay, isTypingFinished, closeLetterAndContinue,];
+var __VLS_27;
+let __VLS_30;
+/** @ts-ignore @type { | typeof __VLS_components.Transition | typeof __VLS_components.Transition} */
+Transition;
+// @ts-ignore
+const __VLS_31 = __VLS_asFunctionalComponent1(__VLS_30, new __VLS_30({
+    enterActiveClass: "transition-opacity duration-700",
+    leaveActiveClass: "transition-opacity duration-300",
+    enterFromClass: "opacity-0",
+    leaveToClass: "opacity-0",
+}));
+const __VLS_32 = __VLS_31({
+    enterActiveClass: "transition-opacity duration-700",
+    leaveActiveClass: "transition-opacity duration-300",
+    enterFromClass: "opacity-0",
+    leaveToClass: "opacity-0",
+}, ...__VLS_functionalComponentArgsRest(__VLS_31));
+const { default: __VLS_35 } = __VLS_33.slots;
+if (__VLS_ctx.showSaveBtn) {
+    __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+        ...{ onClick: (__VLS_ctx.handleSavePoster) },
+        ...{ class: "save-btn" },
+    });
+    /** @type {__VLS_StyleScopedClasses['save-btn']} */ ;
+}
+// @ts-ignore
+[showSaveBtn, handleSavePoster,];
+var __VLS_33;
+let __VLS_36;
+/** @ts-ignore @type { | typeof __VLS_components.Transition | typeof __VLS_components.Transition} */
+Transition;
+// @ts-ignore
+const __VLS_37 = __VLS_asFunctionalComponent1(__VLS_36, new __VLS_36({
+    enterActiveClass: "transition-opacity duration-700",
+    leaveActiveClass: "transition-opacity duration-300",
+    enterFromClass: "opacity-0",
+    leaveToClass: "opacity-0",
+}));
+const __VLS_38 = __VLS_37({
+    enterActiveClass: "transition-opacity duration-700",
+    leaveActiveClass: "transition-opacity duration-300",
+    enterFromClass: "opacity-0",
+    leaveToClass: "opacity-0",
+}, ...__VLS_functionalComponentArgsRest(__VLS_37));
+const { default: __VLS_41 } = __VLS_39.slots;
+if (__VLS_ctx.showFireworksBtn) {
+    __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+        ...{ onClick: (__VLS_ctx.handleBackToPlanet) },
+        ...{ class: "back-planet-btn" },
+    });
+    /** @type {__VLS_StyleScopedClasses['back-planet-btn']} */ ;
+}
+// @ts-ignore
+[showFireworksBtn, handleBackToPlanet,];
+var __VLS_39;
+let __VLS_42;
+/** @ts-ignore @type { | typeof __VLS_components.Transition | typeof __VLS_components.Transition} */
+Transition;
+// @ts-ignore
+const __VLS_43 = __VLS_asFunctionalComponent1(__VLS_42, new __VLS_42({
+    enterActiveClass: "transition-opacity duration-700",
+    leaveActiveClass: "transition-opacity duration-300",
+    enterFromClass: "opacity-0",
+    leaveToClass: "opacity-0",
+}));
+const __VLS_44 = __VLS_43({
+    enterActiveClass: "transition-opacity duration-700",
+    leaveActiveClass: "transition-opacity duration-300",
+    enterFromClass: "opacity-0",
+    leaveToClass: "opacity-0",
+}, ...__VLS_functionalComponentArgsRest(__VLS_43));
+const { default: __VLS_47 } = __VLS_45.slots;
+if (__VLS_ctx.showFireworksBtn) {
+    __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+        ...{ onClick: (__VLS_ctx.toggleFireworks) },
+        ...{ class: "fireworks-btn" },
+        ...{ class: ({ 'is-on': __VLS_ctx.fireworksOn }) },
+    });
+    /** @type {__VLS_StyleScopedClasses['fireworks-btn']} */ ;
+    /** @type {__VLS_StyleScopedClasses['is-on']} */ ;
+    (__VLS_ctx.fireworksOn ? '熄灭烟花' : '点燃烟花');
+}
+// @ts-ignore
+[showFireworksBtn, toggleFireworks, fireworksOn, fireworksOn,];
+var __VLS_45;
+if (__VLS_ctx.currentAct === 1) {
+    __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+        ...{ onClick: (__VLS_ctx.resetDrawing) },
+        ...{ class: "reset-btn" },
+    });
+    /** @type {__VLS_StyleScopedClasses['reset-btn']} */ ;
+}
+// @ts-ignore
+[currentAct, resetDrawing,];
+const __VLS_export = (await import('vue')).defineComponent({
+    __typeEmits: {},
+});
+export default {};

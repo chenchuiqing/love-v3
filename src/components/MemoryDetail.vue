@@ -6,6 +6,7 @@ import { useMusicPlayerStore } from '@/stores/musicPlayer'
 import { AnimatePresence, Motion } from 'motion-v'
 import { Icon } from '@iconify/vue'
 import { AppleCard, AppleCardCarousel, AppleCarouselItem } from '@/components/ui/apple-card-carousel'
+import CommentSection from '@/components/CommentSection.vue'
 
 const props = defineProps<{
   memory: Memory
@@ -428,6 +429,8 @@ onUnmounted(() => {
           {{ isCurrentPlaying ? '暂停' : '播放' }}
         </button>
       </div>
+
+      <CommentSection :memory-id="memory.id" />
 
       <button class="back-button" @click="handleClose">
         ← 返回星球

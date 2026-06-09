@@ -1,51 +1,70 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { logoutAdmin } from '@/api/auth'
+import { userLogout, getCachedUser } from '@/api/userAuth'
+import { useNotificationStore } from '@/stores/notifications'
 
 const route = useRoute()
 const router = useRouter()
+const notifStore = useNotificationStore()
 
 const pageTitle = computed(() => {
-  if (route.name === 'AdminMemoryCreate') return '新建记忆点'
-  if (route.name === 'AdminMemoryEdit') return '编辑记忆点'
+  if (route.name === 'PublishMemoryCreate') return '新建记忆点'
+  if (route.name === 'PublishMemoryEdit') return '编辑记忆点'
   return '记忆点列表'
 })
 
+const currentUser = computed(() => getCachedUser())
+
 const handleLogout = async () => {
-  await logoutAdmin()
-  await router.push({ name: 'AdminLogin' })
+  notifStore.disconnect()
+  await userLogout()
+  await router.push({ name: 'PublishLogin' })
 }
+
+onMounted(() => {
+  notifStore.connect()
+  notifStore.loadUnreadCount()
+})
+
+onUnmounted(() => {
+  notifStore.disconnect()
+})
 </script>
 
 <template>
-  <div class="admin-layout">
-    <header class="admin-header">
+  <div class="publish-layout">
+    <header class="publish-header">
       <div>
-        <p class="brand">记忆点后台</p>
+        <p class="brand">记忆点管理 · {{ currentUser?.name ?? '' }}</p>
         <h1 class="title">{{ pageTitle }}</h1>
       </div>
       <nav class="actions">
-        <RouterLink class="link" :to="{ name: 'AdminMemoryList' }">列表</RouterLink>
-        <RouterLink class="link" :to="{ name: 'AdminMemoryCreate' }">新增</RouterLink>
+        <RouterLink class="link" :to="{ name: 'PublishMemoryList' }">列表</RouterLink>
+        <RouterLink class="link" :to="{ name: 'PublishMemoryCreate' }">新增</RouterLink>
+        <div class="notif-wrapper">
+          <button class="notif-btn" @click="notifStore.markAllRead">
+            {{ notifStore.unreadCount > 0 ? `🔔 ${notifStore.unreadCount}` : '🔕' }}
+          </button>
+        </div>
         <button class="logout" type="button" @click="handleLogout">退出登录</button>
       </nav>
     </header>
-    <main class="admin-main">
+    <main class="publish-main">
       <RouterView />
     </main>
   </div>
 </template>
 
 <style scoped>
-.admin-layout {
+.publish-layout {
   min-height: 100vh;
   background: #f4f6fb;
   color: #1d2433;
 }
 
-.admin-header {
+.publish-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -78,6 +97,18 @@ const handleLogout = async () => {
   font-weight: 500;
 }
 
+.notif-wrapper {
+  position: relative;
+}
+
+.notif-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 0.25rem;
+}
+
 .logout {
   border: none;
   border-radius: 0.5rem;
@@ -87,14 +118,14 @@ const handleLogout = async () => {
   cursor: pointer;
 }
 
-.admin-main {
+.publish-main {
   max-width: 1024px;
   margin: 0 auto;
   padding: 1.2rem;
 }
 
 @media (max-width: 768px) {
-  .admin-header {
+  .publish-header {
     flex-wrap: wrap;
     padding: 0.75rem 1rem;
   }
@@ -112,7 +143,7 @@ const handleLogout = async () => {
     padding: 0.35rem 0.6rem;
   }
 
-  .admin-main {
+  .publish-main {
     padding: 0.75rem;
   }
 }

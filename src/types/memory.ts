@@ -40,3 +40,30 @@ export interface Memory {
 }
 
 export type PlanetPhase = 'forming' | 'exploring' | 'zooming' | 'viewing' | 'returning' | 'awakening'
+
+export interface Comment {
+  id: string
+  memoryId: string
+  parentId: string | null
+  userId: string
+  userName: string
+  content: string
+  createdAt: string
+  replies: Comment[]
+}
+
+export type NotificationType = 'new_memory' | 'new_comment' | 'new_reply'
+
+export interface AppNotification {
+  id: string
+  userId: string
+  type: NotificationType
+  title: string
+  content: string | null
+  memoryId: string
+  commentId: string | null
+  actorId: string
+  actorName: string
+  isRead: boolean
+  createdAt: string
+}

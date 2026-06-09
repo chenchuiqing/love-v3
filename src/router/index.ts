@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { checkAdminSession } from '@/api/auth'
+import { checkUserSession } from '@/api/userAuth'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -10,38 +10,38 @@ const router = createRouter({
       component: () => import('../views/Home.vue')
     },
     {
-      path: '/admin/login',
-      name: 'AdminLogin',
-      component: () => import('@/views/admin/AdminLogin.vue'),
+      path: '/publish/login',
+      name: 'PublishLogin',
+      component: () => import('@/views/publish/PublishLogin.vue'),
       meta: {
         guestOnly: true,
       },
     },
     {
-      path: '/admin',
-      component: () => import('@/views/admin/AdminLayout.vue'),
+      path: '/publish',
+      component: () => import('@/views/publish/PublishLayout.vue'),
       meta: {
-        requiresAdminAuth: true,
+        requiresUserAuth: true,
       },
       children: [
         {
           path: '',
-          redirect: '/admin/memories',
+          redirect: '/publish/memories',
         },
         {
           path: 'memories',
-          name: 'AdminMemoryList',
-          component: () => import('@/views/admin/AdminMemoryList.vue'),
+          name: 'PublishMemoryList',
+          component: () => import('@/views/publish/PublishMemoryList.vue'),
         },
         {
           path: 'memories/new',
-          name: 'AdminMemoryCreate',
-          component: () => import('@/views/admin/AdminMemoryForm.vue'),
+          name: 'PublishMemoryCreate',
+          component: () => import('@/views/publish/PublishMemoryForm.vue'),
         },
         {
           path: 'memories/:id/edit',
-          name: 'AdminMemoryEdit',
-          component: () => import('@/views/admin/AdminMemoryForm.vue'),
+          name: 'PublishMemoryEdit',
+          component: () => import('@/views/publish/PublishMemoryForm.vue'),
         },
       ],
     },
@@ -49,25 +49,25 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
-  const requiresAdminAuth = to.matched.some((record) => record.meta.requiresAdminAuth)
+  const requiresUserAuth = to.matched.some((record) => record.meta.requiresUserAuth)
   const guestOnly = to.matched.some((record) => record.meta.guestOnly)
 
-  if (!requiresAdminAuth && !guestOnly) {
+  if (!requiresUserAuth && !guestOnly) {
     return true
   }
 
-  const isAuthed = await checkAdminSession()
+  const user = await checkUserSession()
 
-  if (requiresAdminAuth && !isAuthed) {
+  if (requiresUserAuth && !user) {
     return {
-      name: 'AdminLogin',
+      name: 'PublishLogin',
       query: { redirect: to.fullPath },
     }
   }
 
-  if (guestOnly && isAuthed) {
+  if (guestOnly && user) {
     return {
-      name: 'AdminMemoryList',
+      name: 'PublishMemoryList',
     }
   }
 

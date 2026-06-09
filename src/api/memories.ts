@@ -10,7 +10,7 @@ interface MemoryResponse {
   data: Memory
 }
 
-type CreateAdminMemoryInput = Omit<Memory, 'id'>
+type CreateMemoryInput = Omit<Memory, 'id'>
 
 interface UploadResponse {
   data: {
@@ -26,43 +26,43 @@ export const fetchMemories = async (): Promise<Memory[]> => {
   return result.data
 }
 
-export const fetchAdminMemories = async (): Promise<Memory[]> => {
-  const result = await apiRequest<MemoryListResponse>('/api/admin/memories')
+export const fetchPublishMemories = async (): Promise<Memory[]> => {
+  const result = await apiRequest<MemoryListResponse>('/api/publish/memories')
   return result.data
 }
 
-export const fetchAdminMemoryById = async (id: string): Promise<Memory> => {
-  const result = await apiRequest<MemoryResponse>(`/api/admin/memories/${id}`)
+export const fetchPublishMemoryById = async (id: string): Promise<Memory> => {
+  const result = await apiRequest<MemoryResponse>(`/api/publish/memories/${id}`)
   return result.data
 }
 
-export const createAdminMemory = async (memory: CreateAdminMemoryInput): Promise<Memory> => {
-  const result = await apiRequest<MemoryResponse>('/api/admin/memories', {
+export const createPublishMemory = async (memory: CreateMemoryInput): Promise<Memory> => {
+  const result = await apiRequest<MemoryResponse>('/api/publish/memories', {
     method: 'POST',
     body: JSON.stringify(memory),
   })
   return result.data
 }
 
-export const updateAdminMemory = async (id: string, memory: Partial<Memory>): Promise<Memory> => {
-  const result = await apiRequest<MemoryResponse>(`/api/admin/memories/${id}`, {
+export const updatePublishMemory = async (id: string, memory: Partial<Memory>): Promise<Memory> => {
+  const result = await apiRequest<MemoryResponse>(`/api/publish/memories/${id}`, {
     method: 'PUT',
     body: JSON.stringify(memory),
   })
   return result.data
 }
 
-export const deleteAdminMemory = async (id: string): Promise<void> => {
-  await apiRequest<void>(`/api/admin/memories/${id}`, {
+export const deletePublishMemory = async (id: string): Promise<void> => {
+  await apiRequest<void>(`/api/publish/memories/${id}`, {
     method: 'DELETE',
   })
 }
 
-export const uploadAdminMedia = async (file: File): Promise<string> => {
+export const uploadPublishMedia = async (file: File): Promise<string> => {
   const formData = new FormData()
   formData.append('file', file)
 
-  const response = await fetch('/api/admin/upload', {
+  const response = await fetch('/api/publish/upload', {
     method: 'POST',
     credentials: 'include',
     body: formData,

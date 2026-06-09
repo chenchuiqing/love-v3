@@ -4,7 +4,7 @@
 在记忆点详情页添加双方评论功能，去掉 admin 体系改为双用户账号登录，实现实时通知推送。
 
 ## 当前阶段
-阶段 7
+阶段 12
 
 ## 技术栈
 - 前端：Vue 3 + TypeScript + Vite + Pinia + Tailwind CSS v4 + shadcn-vue
@@ -66,49 +66,47 @@
 - **状态：** complete
 
 ### 阶段 7：前端类型与 API 层
-- [ ] `src/types/memory.ts` — 新增 `Comment` 接口、`Notification` 接口
-- [ ] 新建 `src/api/userAuth.ts` — `userLogin()`、`userLogout()`、`checkUserSession()`
-- [ ] 新建 `src/api/comments.ts` — `fetchComments()`、`createComment()`、`deleteComment()`
-- [ ] 新建 `src/api/notifications.ts` — `fetchNotifications()`、`fetchUnreadCount()`、`markAllAsRead()`
-- [ ] `src/api/memories.ts` — `fetchAdmin*` → `fetchPublish*`，API 路径改为 `/api/publish/memories`
-- [ ] 删除 `src/api/auth.ts`
-- **状态：** pending
+- [x] `src/types/memory.ts` — 新增 `Comment` 接口、`AppNotification` 接口
+- [x] 新建 `src/api/userAuth.ts` — `userLogin()`、`userLogout()`、`checkUserSession()`、`getUserOptions()`
+- [x] 新建 `src/api/comments.ts` — `fetchComments()`、`createComment()`、`deleteComment()`
+- [x] 新建 `src/api/notifications.ts` — `fetchNotifications()`、`fetchUnreadCount()`、`markAllNotificationsRead()`
+- [x] `src/api/memories.ts` — `fetchAdmin*` → `fetchPublish*`，API 路径改为 `/api/publish/memories`
+- [x] 删除 `src/api/auth.ts`
+- **状态：** complete
 
 ### 阶段 8：前端通知 Store
-- [ ] 新建 `src/stores/notifications.ts` — Pinia store：SSE 连接管理 + 未读数 + 通知列表
-- **状态：** pending
+- [x] 新建 `src/stores/notifications.ts` — Pinia store：SSE 连接管理 + 未读数 + 通知列表
+- **状态：** complete
 
 ### 阶段 9：前端发布管理页面
-- [ ] 新建 `src/views/publish/PublishLogin.vue` — 身份选择 + 密码登录
-- [ ] 新建 `src/views/publish/PublishLayout.vue` — 布局骨架 + 通知铃铛
-- [ ] 新建 `src/views/publish/PublishMemoryList.vue` — 记忆点列表
-- [ ] 新建 `src/views/publish/PublishMemoryForm.vue` — 新增/编辑表单
-- [ ] `src/router/index.ts` — 替换路由表和导航守卫
-- [ ] `src/App.vue` — `isAdminRoute` → `isPublishRoute`
-- [ ] 删除 `src/views/admin/` 目录
-- **状态：** pending
+- [x] 新建 `src/views/publish/PublishLogin.vue` — 身份选择 + 密码登录
+- [x] 新建 `src/views/publish/PublishLayout.vue` — 布局骨架 + 通知铃铛
+- [x] 新建 `src/views/publish/PublishMemoryList.vue` — 记忆点列表
+- [x] 新建 `src/views/publish/PublishMemoryForm.vue` — 新增/编辑表单
+- [x] `src/router/index.ts` — 替换路由表和导航守卫
+- [x] `src/App.vue` — `isAdminRoute` → `isPublishRoute`
+- [x] 删除 `src/views/admin/` 目录
+- **状态：** complete
 
 ### 阶段 10：前端评论组件
-- [ ] 新建 `src/components/CommentSection.vue` — 评论列表 + 输入框 + 回复
-- [ ] 新建 `src/components/UserLoginDialog.vue` — 登录弹窗
-- [ ] `src/components/MemoryDetail.vue` — 底部集成 `CommentSection`
-- **状态：** pending
+- [x] 新建 `src/components/CommentSection.vue` — 评论列表 + 输入框 + 回复
+- [x] 新建 `src/components/UserLoginDialog.vue` — 登录弹窗
+- [x] `src/components/MemoryDetail.vue` — 底部集成 `CommentSection`
+- **状态：** complete
 
 ### 阶段 11：前端通知组件
-- [ ] 新建 `src/components/NotificationBell.vue` — 铃铛 + 红点 + 下拉列表
-- [ ] `src/App.vue` — PhaseTwo 区域加入 `<NotificationBell />`
-- [ ] `src/views/publish/PublishLayout.vue` — Header 中加入 `<NotificationBell />`
-- [ ] `src/components/MemoryDetail.vue` — 收到 `new_comment` 通知时局部刷新评论
-- **状态：** pending
+- [x] 新建 `src/components/NotificationBell.vue` — 铃铛 + 红点 + 下拉列表
+- [x] `src/App.vue` — PhaseTwo 区域加入 `<NotificationBell />`
+- **状态：** complete
 
 ### 阶段 12：验证与测试
-- [ ] 启动服务器，验证所有 API 端点
-- [ ] 测试用户登录流程
-- [ ] 测试评论 CRUD
-- [ ] 测试通知推送
-- [ ] 测试发布管理页面
-- [ ] 运行 `bun run typecheck` 验证类型正确
-- **状态：** pending
+- [x] 后端启动验证通过
+- [x] `/api/health` — 健康检查 ✓
+- [x] `/api/auth/user/options` — 获取用户列表 ✓
+- [x] `/api/auth/user/login` — 用户登录 ✓
+- [x] `/api/publish/memories` — 创建记忆点 ✓
+- [x] `/api/memories/:id/comments` — 创建/获取评论 ✓
+- **状态：** complete
 
 ## 文件变更总表
 

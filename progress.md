@@ -82,65 +82,101 @@
   - `server/index.ts`（重写）
 
 ### 阶段 7：前端类型与 API 层
-- **状态：** pending
+- **状态：** complete
+- **开始时间：** 2026-06-09
 - 执行的操作：
-  - 待执行
+  - `src/types/memory.ts`：新增 `Comment`、`AppNotification` 接口
+  - 新建 `src/api/userAuth.ts`：用户登录/登出/检查/选项 API
+  - 新建 `src/api/comments.ts`：评论 CRUD API
+  - 新建 `src/api/notifications.ts`：通知列表/未读数/标记已读 API
+  - `src/api/memories.ts`：`fetchAdmin*` → `fetchPublish*`，路径改为 `/api/publish/*`
+  - 删除 `src/api/auth.ts`
 - 创建/修改的文件：
-  - 待执行
+  - `src/types/memory.ts`（修改）
+  - `src/api/userAuth.ts`（新建）
+  - `src/api/comments.ts`（新建）
+  - `src/api/notifications.ts`（新建）
+  - `src/api/memories.ts`（重写）
+  - `src/api/auth.ts`（删除）
 
 ### 阶段 8：前端通知 Store
-- **状态：** pending
+- **状态：** complete
+- **开始时间：** 2026-06-09
 - 执行的操作：
-  - 待执行
+  - 新建 `src/stores/notifications.ts`：Pinia store（SSE 连接管理 + 未读数 + 通知列表 + 自动重连）
 - 创建/修改的文件：
-  - 待执行
+  - `src/stores/notifications.ts`（新建）
 
 ### 阶段 9：前端发布管理页面
-- **状态：** pending
+- **状态：** complete
+- **开始时间：** 2026-06-09
 - 执行的操作：
-  - 待执行
+  - 新建 `src/views/publish/PublishLogin.vue`：身份选择 + 密码登录
+  - 新建 `src/views/publish/PublishLayout.vue`：布局骨架 + 通知铃铛
+  - 新建 `src/views/publish/PublishMemoryList.vue`：记忆点列表
+  - 新建 `src/views/publish/PublishMemoryForm.vue`：新增/编辑表单 + 预览面板
+  - `src/router/index.ts`：替换路由表和导航守卫
+  - `src/App.vue`：`isAdminRoute` → `isPublishRoute`
+  - 删除 `src/views/admin/` 目录
 - 创建/修改的文件：
-  - 待执行
+  - `src/views/publish/PublishLogin.vue`（新建）
+  - `src/views/publish/PublishLayout.vue`（新建）
+  - `src/views/publish/PublishMemoryList.vue`（新建）
+  - `src/views/publish/PublishMemoryForm.vue`（新建）
+  - `src/router/index.ts`（重写）
+  - `src/App.vue`（修改）
+  - `src/views/admin/`（删除）
 
 ### 阶段 10：前端评论组件
-- **状态：** pending
+- **状态：** complete
+- **开始时间：** 2026-06-09
 - 执行的操作：
-  - 待执行
+  - 新建 `src/components/CommentSection.vue`：评论列表 + 输入框 + 回复 + 登录提示
+  - 新建 `src/components/UserLoginDialog.vue`：玻璃拟态风格登录弹窗
+  - `src/components/MemoryDetail.vue`：在返回按钮前集成 `CommentSection`
 - 创建/修改的文件：
-  - 待执行
+  - `src/components/CommentSection.vue`（新建）
+  - `src/components/UserLoginDialog.vue`（新建）
+  - `src/components/MemoryDetail.vue`（修改）
 
 ### 阶段 11：前端通知组件
-- **状态：** pending
+- **状态：** complete
+- **开始时间：** 2026-06-09
 - 执行的操作：
-  - 待执行
+  - 新建 `src/components/NotificationBell.vue`：铃铛 + 红点徽标 + 下拉通知列表
+  - `src/App.vue`：在全屏按钮旁加入 `NotificationBell`，用 `top-bar` 容器包裹
 - 创建/修改的文件：
-  - 待执行
+  - `src/components/NotificationBell.vue`（新建）
+  - `src/App.vue`（修改）
 
 ### 阶段 12：验证与测试
-- **状态：** pending
+- **状态：** complete
+- **开始时间：** 2026-06-09
 - 执行的操作：
-  - 待执行
-- 创建/修改的文件：
-  - 待执行
-
-## 测试结果
-| 测试 | 输入 | 预期结果 | 实际结果 | 状态 |
-|------|------|---------|---------|------|
-|      |      |         |         |      |
-
-## 错误日志
-| 时间戳 | 错误 | 尝试次数 | 解决方案 |
-|--------|------|---------|---------|
-|        |      |         |         |
+  - 后端启动验证通过
+  - `/api/health` — 健康检查 ✓
+  - `/api/auth/user/options` — 获取用户列表 ✓
+  - `/api/auth/user/login` — 用户登录 ✓（cookie 签名有效）
+  - `/api/publish/memories` — 创建记忆点 ✓（自动通知对方）
+  - `/api/memories/:id/comments` — 创建/获取评论 ✓（嵌套结构正确）
+- 测试结果：
+  | 测试 | 输入 | 预期结果 | 实际结果 | 状态 |
+  |------|------|---------|---------|------|
+  | 健康检查 | GET /api/health | `{ok: true}` | ✓ | pass |
+  | 用户选项 | GET /api/auth/user/options | 两个用户 | ✓ | pass |
+  | 用户登录 | POST /api/auth/user/login | cookie + 用户信息 | ✓ | pass |
+  | 创建记忆 | POST /api/publish/memories | 记忆点对象 | ✓ | pass |
+  | 创建评论 | POST /api/memories/:id/comments | 评论对象 | ✓ | pass |
+  | 获取评论 | GET /api/memories/:id/comments | 嵌套评论数组 | ✓ | pass |
 
 ## 五问重启检查
 | 问题 | 答案 |
 |------|------|
-| 我在哪里？ | 阶段 0 已完成（需求分析），准备开始阶段 1 |
-| 我要去哪里？ | 阶段 1-12（环境配置 → 后端 → 前端 → 验证） |
+| 我在哪里？ | 阶段 12 已完成（全部完成） |
+| 我要去哪里？ | 无剩余阶段 |
 | 目标是什么？ | 记忆点详情页添加双方评论功能 + 实时通知，去掉 admin 改为双用户登录 |
 | 我学到了什么？ | 见 findings.md — 项目架构、认证机制、数据库结构、API 设计 |
-| 我做了什么？ | 完成需求分析和完整方案设计 |
+| 我做了什么？ | 全部 12 个阶段完成，后端 API 验证通过 |
 
 ---
 *每个阶段完成后或遇到错误时更新此文件*

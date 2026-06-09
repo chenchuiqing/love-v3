@@ -5,9 +5,10 @@ import PhaseOne from './components/PhaseOne.vue';
 import PhaseTwo from './components/PhaseTwo.vue';
 import PhaseThree from './components/PhaseThree.vue';
 import FloatingMusicPlayer from './components/FloatingMusicPlayer.vue';
+import NotificationBell from './components/NotificationBell.vue';
 
 const route = useRoute()
-const isAdminRoute = computed(() => route.path.startsWith('/admin'))
+const isPublishRoute = computed(() => route.path.startsWith('/publish'))
 
 const currentPhase = ref(1);
 const phaseTwoResume = ref(false);
@@ -95,11 +96,11 @@ const syncFullscreenState = () => {
   isFullscreen.value = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.webkitIsFullScreen);
 };
 
-const applyScrollModeByRoute = (adminMode: boolean) => {
+const applyScrollModeByRoute = (publishMode: boolean) => {
   const appRoot = document.getElementById('app')
   if (!appRoot) return
 
-  if (adminMode) {
+  if (publishMode) {
     document.documentElement.style.overflow = 'auto'
     document.body.style.overflow = 'auto'
     appRoot.style.height = 'auto'
@@ -120,10 +121,10 @@ onMounted(() => {
   document.addEventListener('fullscreenchange', syncFullscreenState);
   document.addEventListener('webkitfullscreenchange', syncFullscreenState);
   syncFullscreenState();
-  applyScrollModeByRoute(isAdminRoute.value)
+  applyScrollModeByRoute(isPublishRoute.value)
 });
 
-watch(isAdminRoute, (nextValue) => {
+watch(isPublishRoute, (nextValue) => {
   applyScrollModeByRoute(nextValue)
 })
 
@@ -141,13 +142,16 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <RouterView v-if="isAdminRoute" />
+  <RouterView v-if="isPublishRoute" />
 
   <main v-else ref="appRef" class="app-root">
-    <!-- 全局全屏按钮（iOS 不支持 Fullscreen API 时自动隐藏） -->
-    <button v-if="isFullscreenSupported" class="fullscreen-button" @click="toggleFullscreen">
-      {{ isFullscreen ? '退出全屏' : '进入全屏' }}
-    </button>
+    <!-- 顶部工具栏 -->
+    <div class="top-bar">
+      <NotificationBell />
+      <button v-if="isFullscreenSupported" class="fullscreen-button" @click="toggleFullscreen">
+        {{ isFullscreen ? '退出全屏' : '进入全屏' }}
+      </button>
+    </div>
 
     <!-- 阶段过渡光芒 -->
     <Transition name="flash">
@@ -208,10 +212,6 @@ body,
 }
 
 .fullscreen-button {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  z-index: 9999;
   padding: 0.45rem 0.8rem;
   border: 1px solid rgba(163, 218, 255, 0.45);
   border-radius: 999px;
@@ -228,6 +228,16 @@ body,
   border-color: rgba(188, 229, 255, 0.82);
   box-shadow: 0 0 16px rgba(123, 193, 255, 0.35);
   transform: translateY(-1px);
+}
+
+.top-bar {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 /* 阶段切换淡入淡出 */
