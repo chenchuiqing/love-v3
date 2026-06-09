@@ -36,6 +36,11 @@ const canDelete = (comment: Comment) => {
   return user && user.id === comment.userId
 }
 
+const displayName = (comment: { userId: string; userName: string }) => {
+  const user = currentUser()
+  return user && user.id === comment.userId ? '我' : comment.userName
+}
+
 const startReply = (comment: Comment) => {
   if (!isLoggedIn.value) {
     showLoginDialog.value = true
@@ -126,7 +131,7 @@ defineExpose({ loadComments })
     <div v-else class="comment-list">
       <div v-for="comment in comments" :key="comment.id" class="comment-item">
         <div class="comment-head">
-          <span class="author-tag" :class="comment.userId">{{ comment.userName }}</span>
+          <span class="author-tag" :class="comment.userId">{{ displayName(comment) }}</span>
           <span class="comment-time">{{ formatTime(comment.createdAt) }}</span>
           <button v-if="canDelete(comment)" class="delete-btn" @click="handleDelete(comment.id)">删除</button>
         </div>
@@ -136,7 +141,7 @@ defineExpose({ loadComments })
         <div v-if="comment.replies.length > 0" class="replies">
           <div v-for="reply in comment.replies" :key="reply.id" class="reply-item">
             <div class="comment-head">
-              <span class="author-tag" :class="reply.userId">{{ reply.userName }}</span>
+              <span class="author-tag" :class="reply.userId">{{ displayName(reply) }}</span>
               <span class="comment-time">{{ formatTime(reply.createdAt) }}</span>
               <button v-if="canDelete(reply)" class="delete-btn" @click="handleDelete(reply.id)">删除</button>
             </div>
@@ -147,7 +152,7 @@ defineExpose({ loadComments })
     </div>
 
     <div v-if="replyTarget" class="reply-indicator">
-      回复 {{ replyTarget.userName }}：
+      回复 {{ displayName(replyTarget) }}：
       <span class="reply-preview">{{ replyTarget.content.slice(0, 30) }}{{ replyTarget.content.length > 30 ? '...' : '' }}</span>
       <button class="cancel-reply" @click="cancelReply">取消</button>
     </div>

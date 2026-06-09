@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { RouterView, useRoute } from 'vue-router'
+import { RouterView, useRoute, useRouter } from 'vue-router'
+import { checkUserSession } from '@/api/userAuth'
 import PhaseOne from './components/PhaseOne.vue';
 import PhaseTwo from './components/PhaseTwo.vue';
 import PhaseThree from './components/PhaseThree.vue';
@@ -8,8 +9,10 @@ import FloatingMusicPlayer from './components/FloatingMusicPlayer.vue';
 import NotificationBell from './components/NotificationBell.vue';
 
 const route = useRoute()
+const router = useRouter()
 const isPublishRoute = computed(() => route.path.startsWith('/publish'))
 
+const isLoggedIn = ref(false)
 const currentPhase = ref(1);
 const phaseTwoResume = ref(false);
 const visitedMemoryIds = ref(new Set<string>());
@@ -114,7 +117,14 @@ const applyScrollModeByRoute = (publishMode: boolean) => {
   appRoot.style.minHeight = ''
 }
 
+const handleCheckLoginStatus = async () => {
+  const user = await checkUserSession()
+  isLoggedIn.value = !!user
+}
+
 onMounted(() => {
+  handleCheckLoginStatus()
+
   const el = document.documentElement as HTMLElement & FullscreenElement;
   isFullscreenSupported.value = !!(el.requestFullscreen || el.webkitRequestFullscreen);
 
@@ -123,6 +133,12 @@ onMounted(() => {
   syncFullscreenState();
   applyScrollModeByRoute(isPublishRoute.value)
 });
+
+watch(isPublishRoute, (isPublish) => {
+  if (!isPublish) {
+    handleCheckLoginStatus()
+  }
+})
 
 watch(isPublishRoute, (nextValue) => {
   applyScrollModeByRoute(nextValue)
@@ -148,7 +164,10 @@ onUnmounted(() => {
     <!-- 顶部工具栏 -->
     <div class="top-bar">
       <NotificationBell />
-      <button v-if="isFullscreenSupported" class="fullscreen-button" @click="toggleFullscreen">
+      <button v-if="!isLoggedIn" class="top-bar-btn" @click="router.push('/publish/login')">
+        登录
+      </button>
+      <button v-if="isFullscreenSupported" class="top-bar-btn" @click="toggleFullscreen">
         {{ isFullscreen ? '退出全屏' : '进入全屏' }}
       </button>
     </div>
@@ -211,7 +230,7 @@ body,
   overflow: hidden;
 }
 
-.fullscreen-button {
+.top-bar-btn {
   padding: 0.45rem 0.8rem;
   border: 1px solid rgba(163, 218, 255, 0.45);
   border-radius: 999px;
@@ -224,7 +243,7 @@ body,
   transition: all 220ms ease;
 }
 
-.fullscreen-button:hover {
+.top-bar-btn:hover {
   border-color: rgba(188, 229, 255, 0.82);
   box-shadow: 0 0 16px rgba(123, 193, 255, 0.35);
   transform: translateY(-1px);
