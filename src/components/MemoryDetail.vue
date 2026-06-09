@@ -3,6 +3,8 @@ import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import * as THREE from 'three'
 import type { Memory } from '@/types/memory'
 import { useMusicPlayerStore } from '@/stores/musicPlayer'
+import { AnimatePresence, Motion } from 'motion-v'
+import { Icon } from '@iconify/vue'
 import { AppleCard, AppleCardCarousel, AppleCarouselItem } from '@/components/ui/apple-card-carousel'
 
 const props = defineProps<{
@@ -19,6 +21,7 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 const displayedText = ref('')
 const isImageLoaded = ref(false)
 const isPortraitImage = ref(false)
+const isImageExpanded = ref(false)
 
 const musicPlayer = useMusicPlayerStore()
 
@@ -251,6 +254,22 @@ const handleImageLoad = (e: Event) => {
   isImageLoaded.value = true
 }
 
+function openImageExpand() {
+  isImageExpanded.value = true
+  document.body.style.overflow = 'hidden'
+}
+
+function closeImageExpand() {
+  isImageExpanded.value = false
+  document.body.style.overflow = ''
+}
+
+function handleExpandKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && isImageExpanded.value) {
+    closeImageExpand()
+  }
+}
+
 const toggleAudio = async () => {
   const url = props.memory.content.audioUrl
   if (!url) return
@@ -287,6 +306,7 @@ watch(() => props.memory, () => {
 onMounted(() => {
   initParticleBackground()
   window.addEventListener('resize', handleResize)
+  window.addEventListener('keydown', handleExpandKeydown)
 
   setTimeout(() => {
     startTypewriter()
@@ -296,6 +316,8 @@ onMounted(() => {
 onUnmounted(() => {
   cancelAnimationFrame(animationId)
   window.removeEventListener('resize', handleResize)
+  window.removeEventListener('keydown', handleExpandKeydown)
+  document.body.style.overflow = ''
 
   if (renderer) {
     renderer.dispose()
@@ -323,7 +345,8 @@ onUnmounted(() => {
       <div
         v-if="shouldUseSingleImageLayout"
         class="image-container"
-        :class="{ 'is-portrait': isPortraitImage }"
+        :class="{ 'is-portrait': isPortraitImage, 'is-clickable': true }"
+        @click="openImageExpand"
       >
         <img
           :src="mediaImages[0]"
@@ -332,6 +355,9 @@ onUnmounted(() => {
           :class="{ 'is-loaded': isImageLoaded }"
           @load="handleImageLoad"
         />
+        <div class="image-expand-hint">
+          <Icon icon="tabler:zoom-in" class="image-expand-hint-icon" />
+        </div>
       </div>
 
       <div
@@ -407,6 +433,41 @@ onUnmounted(() => {
         ← 返回星球
       </button>
     </div>
+
+    <Teleport to="body">
+      <AnimatePresence>
+        <div v-if="isImageExpanded" class="fixed inset-0 z-[9999] overflow-auto" @click="closeImageExpand">
+          <Motion
+            :initial="{ opacity: 0 }"
+            :animate="{ opacity: 1 }"
+            :exit="{ opacity: 0 }"
+            :transition="{ duration: 0.2 }"
+            class="fixed inset-0 size-full bg-black/80 backdrop-blur-xl"
+          />
+          <Motion
+            :initial="{ opacity: 0, scale: 0.95 }"
+            :animate="{ opacity: 1, scale: 1 }"
+            :exit="{ opacity: 0, scale: 0.95 }"
+            :transition="{ duration: 0.25, ease: 'easeOut' }"
+            class="relative z-60 mx-auto my-10 h-fit max-w-5xl rounded-3xl bg-white p-4 md:p-10 dark:bg-neutral-900"
+            @click.stop
+          >
+            <button class="sticky top-4 right-0 ml-auto flex size-8 items-center justify-center rounded-full bg-black dark:bg-white" @click="closeImageExpand">
+              <Icon icon="tabler:x" class="size-6 text-neutral-100 dark:text-neutral-900" />
+            </button>
+            <div class="text-base font-medium text-black dark:text-white">回忆照片</div>
+            <div class="mt-4 text-2xl font-semibold text-neutral-700 md:text-5xl dark:text-white">{{ memory.title }}</div>
+            <div class="py-10">
+              <img
+                :src="mediaImages[0]"
+                :alt="memory.title"
+                class="block w-full max-h-[78vh] object-contain rounded-xl"
+              />
+            </div>
+          </Motion>
+        </div>
+      </AnimatePresence>
+    </Teleport>
   </div>
 </template>
 
@@ -494,6 +555,7 @@ onUnmounted(() => {
 }
 
 .image-container {
+  position: relative;
   max-width: 400px;
   margin: 0 auto;
 }
@@ -678,5 +740,36 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.5);
   color: white;
+}
+
+.image-container.is-clickable {
+  cursor: pointer;
+}
+
+.image-expand-hint {
+  position: absolute;
+  bottom: 0.5rem;
+  right: 0.5rem;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+
+.image-container.is-clickable:hover .image-expand-hint {
+  opacity: 1;
+}
+
+.image-expand-hint-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  color: rgba(255, 255, 255, 0.9);
 }
 </style>
