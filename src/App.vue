@@ -1,18 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { RouterView, useRoute, useRouter } from 'vue-router'
-import { checkUserSession } from '@/api/userAuth'
+import { RouterView, useRoute } from 'vue-router'
 import PhaseOne from './components/PhaseOne.vue';
 import PhaseTwo from './components/PhaseTwo.vue';
 import PhaseThree from './components/PhaseThree.vue';
 import FloatingMusicPlayer from './components/FloatingMusicPlayer.vue';
-import NotificationBell from './components/NotificationBell.vue';
+import UserProfileDropdown from './components/UserProfileDropdown.vue';
 
 const route = useRoute()
-const router = useRouter()
 const isPublishRoute = computed(() => route.path.startsWith('/publish'))
 
-const isLoggedIn = ref(false)
 const currentPhase = ref(1);
 const phaseTwoResume = ref(false);
 const visitedMemoryIds = ref(new Set<string>());
@@ -117,14 +114,7 @@ const applyScrollModeByRoute = (publishMode: boolean) => {
   appRoot.style.minHeight = ''
 }
 
-const handleCheckLoginStatus = async () => {
-  const user = await checkUserSession()
-  isLoggedIn.value = !!user
-}
-
 onMounted(() => {
-  handleCheckLoginStatus()
-
   const el = document.documentElement as HTMLElement & FullscreenElement;
   isFullscreenSupported.value = !!(el.requestFullscreen || el.webkitRequestFullscreen);
 
@@ -133,12 +123,6 @@ onMounted(() => {
   syncFullscreenState();
   applyScrollModeByRoute(isPublishRoute.value)
 });
-
-watch(isPublishRoute, (isPublish) => {
-  if (!isPublish) {
-    handleCheckLoginStatus()
-  }
-})
 
 watch(isPublishRoute, (nextValue) => {
   applyScrollModeByRoute(nextValue)
@@ -163,10 +147,7 @@ onUnmounted(() => {
   <main v-else ref="appRef" class="app-root">
     <!-- 顶部工具栏 -->
     <div class="top-bar">
-      <NotificationBell />
-      <button v-if="!isLoggedIn" class="top-bar-btn" @click="router.push('/publish/login')">
-        登录
-      </button>
+      <UserProfileDropdown />
       <button v-if="isFullscreenSupported" class="top-bar-btn" @click="toggleFullscreen">
         {{ isFullscreen ? '退出全屏' : '进入全屏' }}
       </button>
