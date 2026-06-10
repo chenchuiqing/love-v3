@@ -23,6 +23,8 @@ const pageTitle = computed(() => {
       <nav class="actions">
         <RouterLink class="link" :to="{ name: 'PublishMemoryList' }">列表</RouterLink>
         <RouterLink class="link" :to="{ name: 'PublishMemoryCreate' }">新增</RouterLink>
+        <span class="divider">|</span>
+        <RouterLink class="link back" :to="{ name: 'Home' }">返回星球</RouterLink>
         <UserProfileDropdown theme="light" />
       </nav>
     </header>
@@ -72,6 +74,18 @@ const pageTitle = computed(() => {
   font-weight: 500;
 }
 
+.link.back {
+  color: #6b7280;
+  font-weight: 400;
+  font-size: 0.85rem;
+}
+
+.divider {
+  color: #d1d5db;
+  font-size: 0.85rem;
+  user-select: none;
+}
+
 .publish-main {
   max-width: 1024px;
   margin: 0 auto;
@@ -90,6 +104,10 @@ const pageTitle = computed(() => {
 
   .link {
     font-size: 0.88rem;
+  }
+
+  .link.back {
+    font-size: 0.8rem;
   }
 
   .publish-main {
