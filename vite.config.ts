@@ -15,6 +15,20 @@ export default defineConfig({
     host: true,
     port: 5213,
     proxy: {
+      '/api/notifications/stream': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+        // SSE 需要禁用缓冲，否则数据会被代理攒住不发送
+        configure: (proxy) => {
+          proxy.on('proxyRes', (proxyRes) => {
+            // 确保 SSE 响应不被缓冲
+            if (proxyRes.headers['content-type']?.includes('text/event-stream')) {
+              proxyRes.headers['cache-control'] = 'no-cache'
+              proxyRes.headers['x-accel-buffering'] = 'no'
+            }
+          })
+        },
+      },
       '/api': 'http://127.0.0.1:3000',
       '/uploads': 'http://127.0.0.1:3000',
     }

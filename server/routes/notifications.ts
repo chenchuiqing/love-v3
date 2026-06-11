@@ -16,21 +16,35 @@ notificationRoutes.get('/notifications/stream', requireUserAuth, async (c) => {
   const session = c.get('userSession')
 
   return streamSSE(c, async (stream) => {
+    let closed = false
+
     const callback = async (data: unknown) => {
-      await stream.writeSSE({
-        event: 'notification',
-        data: JSON.stringify(data),
-      })
+      if (closed) return
+      try {
+        await stream.writeSSE({
+          event: 'notification',
+          data: JSON.stringify(data),
+        })
+      } catch {
+        closed = true
+      }
     }
 
     addListener(session.userId, callback)
 
     try {
-      while (true) {
-        await stream.sleep(30000)
-        await stream.writeSSE({ event: 'ping', data: '' })
+      await stream.writeSSE({ event: 'connected', data: '' })
+
+      while (!closed) {
+        await stream.sleep(15000)
+        try {
+          await stream.writeSSE({ event: 'ping', data: '' })
+        } catch {
+          break
+        }
       }
     } finally {
+      closed = true
       removeListener(session.userId, callback)
     }
   })

@@ -25,7 +25,7 @@ export const notifyUser = (userId: string, data: unknown): void => {
   const listeners = userListeners.get(userId)
   if (listeners) {
     for (const cb of listeners) {
-      void Promise.resolve(cb(data))
+      void Promise.resolve(cb(data)).catch(() => {})
     }
   }
 }
