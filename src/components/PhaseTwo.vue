@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import type { Memory, PlanetPhase } from '@/types/memory'
 import { fetchMemories } from '@/api/memories'
 import MemoryPlanet from './MemoryPlanet.vue'
@@ -10,8 +11,11 @@ const props = defineProps<{
   initialVisitedIds?: string[]
 }>()
 
+const route = useRoute()
+
 const phase = ref<PlanetPhase>(props.resumeExploring ? 'exploring' : 'forming')
 const activeMemory = ref<Memory | null>(null)
+const targetCommentId = ref<string | null>(null)
 const visitedIds = ref(new Set<string>(props.initialVisitedIds ?? []))
 const memories = ref<Memory[]>([])
 const isLoading = ref(true)
@@ -64,6 +68,7 @@ const handleNodeClick = (memory: Memory) => {
 }
 
 const handleZoomComplete = () => {
+  if (phase.value !== 'zooming') return
   phase.value = 'viewing'
 }
 
@@ -72,6 +77,7 @@ const handleDetailClose = () => {
 }
 
 const handleReturnComplete = () => {
+  if (phase.value !== 'returning') return
   activeMemory.value = null
   phase.value = 'exploring'
   if (
@@ -97,6 +103,22 @@ onMounted(() => {
   fetchMemories()
     .then((list) => {
       memories.value = list
+      
+      // 检查 URL 参数，如果有 memoryId 则自动打开对应记忆点
+      const memoryId = route.query.memoryId as string | undefined
+      const commentId = route.query.commentId as string | undefined
+      
+      if (memoryId) {
+        const memory = list.find(m => m.id === memoryId)
+        if (memory) {
+          // 设置目标评论 ID
+          if (commentId) {
+            targetCommentId.value = commentId
+          }
+          // 模拟点击记忆点，打开详情
+          handleNodeClick(memory)
+        }
+      }
     })
     .catch((error: unknown) => {
       loadError.value = error instanceof Error ? error.message : '加载记忆失败'
@@ -108,6 +130,27 @@ onMounted(() => {
 
   if (props.resumeExploring && visitedIds.value.size > 0) {
     syncVisitedToParent()
+  }
+})
+
+// 监听路由参数变化，当已在 Phase 2 时处理通知跳转
+watch(() => route.query.memoryId, (memoryId, oldMemoryId) => {
+  console.log('[PhaseTwo] memoryId watcher:', { memoryId, oldMemoryId, phase: phase.value, memoriesLen: memories.value.length })
+  if (!memoryId) return
+  // 初始加载流程由 onMounted 处理，这里跳过
+  if (memories.value.length === 0 || phase.value === 'forming') {
+    console.log('[PhaseTwo] watcher skipped:', { memoriesLen: memories.value.length, phase: phase.value })
+    return
+  }
+
+  const commentId = route.query.commentId as string | undefined
+  const memory = memories.value.find(m => m.id === memoryId)
+  if (memory) {
+    console.log('[PhaseTwo] watcher found memory, calling handleNodeClick')
+    targetCommentId.value = commentId ?? null
+    handleNodeClick(memory)
+  } else {
+    console.log('[PhaseTwo] watcher: memory not found:', memoryId)
   }
 })
 
@@ -165,6 +208,7 @@ onUnmounted(() => {
       <MemoryDetail
         v-if="showDetail && activeMemory"
         :memory="activeMemory"
+        :scroll-to-comment-id="targetCommentId"
         @close="handleDetailClose"
       />
     </Transition>

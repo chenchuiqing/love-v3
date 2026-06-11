@@ -10,6 +10,7 @@ import CommentSection from '@/components/CommentSection.vue'
 
 const props = defineProps<{
   memory: Memory
+  scrollToCommentId?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -18,6 +19,7 @@ const emit = defineEmits<{
 
 const containerRef = ref<HTMLElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
+const commentSectionRef = ref<InstanceType<typeof CommentSection> | null>(null)
 
 const displayedText = ref('')
 const isImageLoaded = ref(false)
@@ -311,6 +313,22 @@ onMounted(() => {
 
   setTimeout(() => {
     startTypewriter()
+    
+    // 如果有目标评论 ID，滚动到该评论位置
+    if (props.scrollToCommentId && commentSectionRef.value) {
+      // 等待评论加载完成后滚动
+      setTimeout(() => {
+        const commentElement = document.getElementById(`comment-${props.scrollToCommentId}`)
+        if (commentElement) {
+          commentElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          // 添加高亮效果
+          commentElement.classList.add('comment-highlight')
+          setTimeout(() => {
+            commentElement.classList.remove('comment-highlight')
+          }, 3000)
+        }
+      }, 500)
+    }
   }, 800)
 })
 
@@ -430,7 +448,7 @@ onUnmounted(() => {
         </button>
       </div>
 
-      <CommentSection :memory-id="memory.id" />
+      <CommentSection ref="commentSectionRef" :memory-id="memory.id" />
 
       <button class="back-button" @click="handleClose">
         ← 返回星球

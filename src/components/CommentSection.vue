@@ -129,7 +129,7 @@ defineExpose({ loadComments })
     </div>
 
     <div v-else class="comment-list">
-      <div v-for="comment in comments" :key="comment.id" class="comment-item">
+      <div v-for="comment in comments" :key="comment.id" :id="`comment-${comment.id}`" class="comment-item">
         <div class="comment-head">
           <span class="author-tag" :class="comment.userId">{{ displayName(comment) }}</span>
           <span class="comment-time">{{ formatTime(comment.createdAt) }}</span>
@@ -139,7 +139,7 @@ defineExpose({ loadComments })
         <button class="reply-btn" @click="startReply(comment)">回复</button>
 
         <div v-if="comment.replies.length > 0" class="replies">
-          <div v-for="reply in comment.replies" :key="reply.id" class="reply-item">
+          <div v-for="reply in comment.replies" :key="reply.id" :id="`comment-${reply.id}`" class="reply-item">
             <div class="comment-head">
               <span class="author-tag" :class="reply.userId">{{ displayName(reply) }}</span>
               <span class="comment-time">{{ formatTime(reply.createdAt) }}</span>
@@ -406,5 +406,21 @@ defineExpose({ loadComments })
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.35);
   color: rgba(255, 255, 255, 0.9);
+}
+
+/* 评论高亮效果 */
+:global(.comment-highlight) {
+  animation: highlight-fade 3s ease-out;
+}
+
+@keyframes highlight-fade {
+  0% {
+    background-color: rgba(100, 180, 255, 0.3);
+    box-shadow: 0 0 20px rgba(100, 180, 255, 0.5);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
 }
 </style>

@@ -1150,6 +1150,9 @@ onMounted(() => {
     applyFormedState()
   } else if (props.phase === 'forming') {
     animateForming()
+  } else if (props.phase === 'zooming') {
+    applyFormedState()
+    animateZooming()
   }
 })
 

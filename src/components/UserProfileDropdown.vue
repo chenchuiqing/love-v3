@@ -79,6 +79,20 @@ const handleGoToAdmin = () => {
   router.push('/publish/memories')
 }
 
+const handleNotificationClick = (notification: { memoryId: string; commentId?: string | null }) => {
+  isOpen.value = false
+  showNotifications.value = false
+  
+  // 构建跳转 URL
+  const query: Record<string, string> = { memoryId: notification.memoryId }
+  if (notification.commentId) {
+    query.commentId = notification.commentId
+  }
+  
+  // 跳转到主页并传递参数
+  router.push({ path: '/', query })
+}
+
 const handleLogout = async () => {
   notifStore.disconnect()
   await userLogout()
@@ -186,6 +200,7 @@ onUnmounted(() => {
             :key="n.id"
             class="upd-notif-item"
             :class="{ 'upd-notif-item--unread': !n.isRead }"
+            @click="handleNotificationClick(n)"
           >
             <div class="upd-notif-title">{{ n.title }}</div>
             <div v-if="n.content" class="upd-notif-content">{{ n.content }}</div>

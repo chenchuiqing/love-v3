@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { RouterView, useRoute } from 'vue-router'
 import PhaseOne from './components/PhaseOne.vue';
 import PhaseTwo from './components/PhaseTwo.vue';
@@ -114,7 +114,7 @@ const applyScrollModeByRoute = (publishMode: boolean) => {
   appRoot.style.minHeight = ''
 }
 
-onMounted(() => {
+onMounted(async () => {
   const el = document.documentElement as HTMLElement & FullscreenElement;
   isFullscreenSupported.value = !!(el.requestFullscreen || el.webkitRequestFullscreen);
 
@@ -122,10 +122,27 @@ onMounted(() => {
   document.addEventListener('webkitfullscreenchange', syncFullscreenState);
   syncFullscreenState();
   applyScrollModeByRoute(isPublishRoute.value)
+  
+  // 等待路由解析完成
+  await nextTick()
+  
+  // 检查 URL 参数，如果有 memoryId 则直接跳转到 PhaseTwo
+  const memoryId = route.query.memoryId as string | undefined
+  console.log('[App] onMounted route.query:', route.query, 'memoryId:', memoryId, 'currentPhase:', currentPhase.value)
+  if (memoryId && currentPhase.value === 1) {
+    currentPhase.value = 2
+  }
 });
 
 watch(isPublishRoute, (nextValue) => {
   applyScrollModeByRoute(nextValue)
+})
+
+// 监听路由参数变化，如果有 memoryId 则跳转到 PhaseTwo
+watch(() => route.query.memoryId, (memoryId) => {
+  if (memoryId && currentPhase.value !== 2) {
+    currentPhase.value = 2
+  }
 })
 
 onUnmounted(() => {
