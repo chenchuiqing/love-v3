@@ -17,6 +17,15 @@ const replyTarget = ref<Comment | null>(null)
 const submitting = ref(false)
 const isLoggedIn = ref(false)
 const showLoginDialog = ref(false)
+const isCollapsed = ref(false)
+
+const toggleCollapse = () => {
+  isCollapsed.value = !isCollapsed.value
+}
+
+const expand = () => {
+  isCollapsed.value = false
+}
 
 const loadComments = async () => {
   loading.value = true
@@ -112,15 +121,18 @@ onMounted(async () => {
   await loadComments()
 })
 
-defineExpose({ loadComments })
+defineExpose({ loadComments, isCollapsed, expand })
 </script>
 
 <template>
   <div class="comment-section">
-    <div class="section-header">
+    <button class="section-header" @click="toggleCollapse">
+      <span class="collapse-arrow" :class="{ collapsed: isCollapsed }">▾</span>
       <span class="section-title">回忆对话</span>
       <span class="comment-count">{{ comments.length }} 条</span>
-    </div>
+    </button>
+
+    <div v-if="!isCollapsed" class="section-body">
 
     <div v-if="loading" class="loading-hint">加载中...</div>
 
@@ -179,6 +191,7 @@ defineExpose({ loadComments })
       @close="showLoginDialog = false"
       @login-success="handleLoginSuccess"
     />
+    </div>
   </div>
 </template>
 
@@ -192,14 +205,37 @@ defineExpose({ loadComments })
 .section-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 0.4rem;
   margin-bottom: 0.75rem;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.section-header:hover .section-title {
+  color: rgba(255, 255, 255, 1);
+}
+
+.collapse-arrow {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.4);
+  transition: transform 0.25s ease;
+  line-height: 1;
+}
+
+.collapse-arrow.collapsed {
+  transform: rotate(-90deg);
 }
 
 .section-title {
   font-size: 0.95rem;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.9);
+  transition: color 0.2s ease;
 }
 
 .comment-count {

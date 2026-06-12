@@ -297,6 +297,11 @@ const handleResize = () => {
 }
 
 const scrollToComment = (commentId: string) => {
+  // 如果评论区折叠了，先展开
+  if (commentSectionRef.value?.isCollapsed) {
+    commentSectionRef.value.expand()
+  }
+
   // 等待评论加载完成后滚动，支持轮询等待 DOM 挂载
   let attempts = 0
   const MAX_ATTEMPTS = 10
