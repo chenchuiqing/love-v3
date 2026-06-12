@@ -134,8 +134,9 @@ onMounted(() => {
 })
 
 // 监听路由参数变化，当已在 Phase 2 时处理通知跳转
-watch(() => route.query.memoryId, (memoryId, oldMemoryId) => {
-  console.log('[PhaseTwo] memoryId watcher:', { memoryId, oldMemoryId, phase: phase.value, memoriesLen: memories.value.length })
+watch(() => ({ memoryId: route.query.memoryId, commentId: route.query.commentId }), (current, previous) => {
+  const memoryId = current.memoryId as string | undefined
+  console.log('[PhaseTwo] query watcher:', { current, prev: previous, phase: phase.value, memoriesLen: memories.value.length })
   if (!memoryId) return
   // 初始加载流程由 onMounted 处理，这里跳过
   if (memories.value.length === 0 || phase.value === 'forming') {
@@ -143,15 +144,26 @@ watch(() => route.query.memoryId, (memoryId, oldMemoryId) => {
     return
   }
 
-  const commentId = route.query.commentId as string | undefined
+  const commentId = current.commentId as string | undefined
   const memory = memories.value.find(m => m.id === memoryId)
-  if (memory) {
-    console.log('[PhaseTwo] watcher found memory, calling handleNodeClick')
-    targetCommentId.value = commentId ?? null
-    handleNodeClick(memory)
-  } else {
+
+  if (!memory) {
     console.log('[PhaseTwo] watcher: memory not found:', memoryId)
+    return
   }
+
+  // 如果同一个记忆点已打开，只需更新滚动目标评论
+  const sameMemory = previous && previous.memoryId === memoryId
+  if (sameMemory && activeMemory.value && showDetail.value) {
+    console.log('[PhaseTwo] watcher: same memory, updating comment target only')
+    targetCommentId.value = commentId ?? null
+    return
+  }
+
+  // 不同记忆点或详情未打开，完整打开
+  console.log('[PhaseTwo] watcher: different memory, calling handleNodeClick')
+  targetCommentId.value = commentId ?? null
+  handleNodeClick(memory)
 })
 
 onUnmounted(() => {
