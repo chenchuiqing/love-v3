@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import type { Memory, PlanetPhase } from '@/types/memory'
 import { fetchMemories } from '@/api/memories'
 import MemoryPlanet from './MemoryPlanet.vue'
@@ -12,6 +12,7 @@ const props = defineProps<{
 }>()
 
 const route = useRoute()
+const router = useRouter()
 
 const phase = ref<PlanetPhase>(props.resumeExploring ? 'exploring' : 'forming')
 const activeMemory = ref<Memory | null>(null)
@@ -74,6 +75,8 @@ const handleZoomComplete = () => {
 
 const handleDetailClose = () => {
   phase.value = 'returning'
+  // 清除 URL 中的通知跳转参数，防止刷新后再次打开
+  router.replace({ query: {} })
 }
 
 const handleReturnComplete = () => {
