@@ -22,7 +22,6 @@ export const listCommentsByMemoryId = (memoryId: string): CommentDto[] => {
   ).all(memoryId)
 
   const all = rows.map(rowToDto)
-  const topLevel = all.filter((c) => c.parentId === null)
   const byParent = new Map<string, CommentDto[]>()
   for (const c of all) {
     if (c.parentId) {
@@ -31,9 +30,16 @@ export const listCommentsByMemoryId = (memoryId: string): CommentDto[] => {
     }
   }
 
-  for (const parent of topLevel) {
-    parent.replies = byParent.get(parent.id) ?? []
+  const populate = (parent: CommentDto): void => {
+    const children = byParent.get(parent.id) ?? []
+    parent.replies = children.map((child) => {
+      populate(child)
+      return child
+    })
   }
+
+  const topLevel = all.filter((c) => c.parentId === null)
+  for (const p of topLevel) populate(p)
 
   return topLevel
 }

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 import type { Comment } from '@/types/memory'
 import { fetchComments, createComment, deleteComment } from '@/api/comments'
 import { checkUserSession, getCachedUser } from '@/api/userAuth'
 import UserLoginDialog from './UserLoginDialog.vue'
+import CommentNode from './CommentNode.vue'
 
 const props = defineProps<{
   memoryId: string
@@ -18,6 +19,8 @@ const submitting = ref(false)
 const isLoggedIn = ref(false)
 const showLoginDialog = ref(false)
 const isCollapsed = ref(false)
+
+const currentUserId = computed(() => getCachedUser()?.id ?? null)
 
 const toggleCollapse = () => {
   isCollapsed.value = !isCollapsed.value
@@ -38,16 +41,8 @@ const loadComments = async () => {
   }
 }
 
-const currentUser = () => getCachedUser()
-
-const canDelete = (comment: Comment) => {
-  const user = currentUser()
-  return user && user.id === comment.userId
-}
-
 const displayName = (comment: { userId: string; userName: string }) => {
-  const user = currentUser()
-  return user && user.id === comment.userId ? '我' : comment.userName
+  return currentUserId.value && currentUserId.value === comment.userId ? '我' : comment.userName
 }
 
 const startReply = (comment: Comment) => {
@@ -101,20 +96,6 @@ const handleLoginSuccess = () => {
   showLoginDialog.value = false
 }
 
-const formatTime = (dateStr: string) => {
-  const date = new Date(dateStr)
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  const minutes = Math.floor(diff / 60000)
-  if (minutes < 1) return '刚刚'
-  if (minutes < 60) return `${minutes} 分钟前`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours} 小时前`
-  const days = Math.floor(hours / 24)
-  if (days < 7) return `${days} 天前`
-  return date.toLocaleDateString('zh-CN')
-}
-
 onMounted(async () => {
   const user = await checkUserSession()
   isLoggedIn.value = !!user
@@ -141,26 +122,15 @@ defineExpose({ loadComments, isCollapsed, expand })
     </div>
 
     <div v-else class="comment-list">
-      <div v-for="comment in comments" :key="comment.id" :id="`comment-${comment.id}`" class="comment-item">
-        <div class="comment-head">
-          <span class="author-tag" :class="comment.userId">{{ displayName(comment) }}</span>
-          <span class="comment-time">{{ formatTime(comment.createdAt) }}</span>
-          <button v-if="canDelete(comment)" class="delete-btn" @click="handleDelete(comment.id)">删除</button>
-        </div>
-        <p class="comment-content">{{ comment.content }}</p>
-        <button class="reply-btn" @click="startReply(comment)">回复</button>
-
-        <div v-if="comment.replies.length > 0" class="replies">
-          <div v-for="reply in comment.replies" :key="reply.id" :id="`comment-${reply.id}`" class="reply-item">
-            <div class="comment-head">
-              <span class="author-tag" :class="reply.userId">{{ displayName(reply) }}</span>
-              <span class="comment-time">{{ formatTime(reply.createdAt) }}</span>
-              <button v-if="canDelete(reply)" class="delete-btn" @click="handleDelete(reply.id)">删除</button>
-            </div>
-            <p class="comment-content">{{ reply.content }}</p>
-          </div>
-        </div>
-      </div>
+      <CommentNode
+        v-for="comment in comments"
+        :key="comment.id"
+        :comment="comment"
+        :depth="0"
+        :current-user-id="currentUserId"
+        @delete="handleDelete"
+        @reply="startReply"
+      />
     </div>
 
     <div v-if="replyTarget" class="reply-indicator">
@@ -263,93 +233,6 @@ defineExpose({ loadComments, isCollapsed, expand })
 
 .comment-list::-webkit-scrollbar {
   display: none;
-}
-
-.comment-item {
-  padding: 0.75rem;
-  border-radius: 0.65rem;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.comment-head {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.35rem;
-}
-
-.author-tag {
-  font-size: 0.78rem;
-  font-weight: 600;
-  padding: 0.15rem 0.5rem;
-  border-radius: 1rem;
-}
-
-.author-tag.party_a {
-  background: rgba(236, 64, 122, 0.2);
-  color: #ff80ab;
-}
-
-.author-tag.party_b {
-  background: rgba(66, 165, 245, 0.2);
-  color: #80d8ff;
-}
-
-.comment-time {
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.35);
-}
-
-.delete-btn {
-  margin-left: auto;
-  font-size: 0.72rem;
-  color: rgba(255, 100, 100, 0.6);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-}
-
-.delete-btn:hover {
-  color: rgba(255, 100, 100, 1);
-}
-
-.comment-content {
-  margin: 0;
-  font-size: 0.88rem;
-  line-height: 1.6;
-  color: rgba(255, 255, 255, 0.85);
-  white-space: pre-line;
-}
-
-.reply-btn {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.4);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0.2rem 0;
-  margin-top: 0.25rem;
-}
-
-.reply-btn:hover {
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.replies {
-  margin-top: 0.5rem;
-  padding-left: 1rem;
-  border-left: 2px solid rgba(255, 255, 255, 0.1);
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.reply-item {
-  padding: 0.5rem;
-  border-radius: 0.5rem;
-  background: rgba(255, 255, 255, 0.03);
 }
 
 .reply-indicator {
