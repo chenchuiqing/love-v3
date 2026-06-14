@@ -32,7 +32,9 @@ const canDelete = (comment: Comment) => {
 }
 
 const formatTime = (dateStr: string) => {
-  const date = new Date(dateStr)
+  // SQLite CURRENT_TIMESTAMP 返回无时区标记的 UTC 时间（如 "2024-01-01 12:00:00"），
+  // 追加 'Z' 让 JS 正确识别为 UTC 而非本地时间
+  const date = new Date(dateStr + 'Z')
   const now = new Date()
   const diff = now.getTime() - date.getTime()
   const minutes = Math.floor(diff / 60000)

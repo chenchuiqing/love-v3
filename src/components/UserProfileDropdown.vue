@@ -30,7 +30,8 @@ const lastChar = computed(() => {
 })
 
 const formatTime = (dateStr: string) => {
-  const date = new Date(dateStr)
+  // SQLite CURRENT_TIMESTAMP 返回无时区标记的 UTC 时间，追加 'Z' 修正时区
+  const date = new Date(dateStr + 'Z')
   const now = new Date()
   const diff = now.getTime() - date.getTime()
   const minutes = Math.floor(diff / 60000)
