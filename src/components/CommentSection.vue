@@ -18,7 +18,7 @@ const replyTarget = ref<Comment | null>(null)
 const submitting = ref(false)
 const isLoggedIn = ref(false)
 const showLoginDialog = ref(false)
-const isCollapsed = ref(false)
+const isCollapsed = ref(true)
 
 const currentUserId = computed(() => getCachedUser()?.id ?? null)
 

@@ -121,6 +121,8 @@ onMounted(() => {
           // 模拟点击记忆点，打开详情
           handleNodeClick(memory)
         }
+        // 清除 URL 中的通知跳转参数，防止刷新后再次跳转
+        router.replace({ query: {} })
       }
     })
     .catch((error: unknown) => {
