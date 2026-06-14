@@ -61,12 +61,6 @@ const handleClickOutside = (e: MouseEvent) => {
 
 const handleOpenNotifications = () => {
   showNotifications.value = true
-  if (notifStore.unreadCount > 0) {
-    notifStore.markAllRead()
-  }
-  if (notifStore.notifications.length === 0) {
-    notifStore.loadNotifications()
-  }
 }
 
 const handleBackFromNotifications = () => {
@@ -79,18 +73,32 @@ const handleGoToAdmin = () => {
   router.push('/publish/memories')
 }
 
-const handleNotificationClick = (notification: { memoryId: string; commentId?: string | null }) => {
+const handleNotificationClick = (notification: { id: string; isRead: boolean; memoryId: string; commentId?: string | null }) => {
+  // 单独标记已读
+  if (!notification.isRead) {
+    notifStore.markOneRead(notification.id)
+  }
+
   isOpen.value = false
   showNotifications.value = false
-  
+
   // 构建跳转 URL
   const query: Record<string, string> = { memoryId: notification.memoryId }
   if (notification.commentId) {
     query.commentId = notification.commentId
   }
-  
+
   // 跳转到主页并传递参数
   router.push({ path: '/', query })
+}
+
+const handleDeleteNotification = (e: Event, id: string) => {
+  e.stopPropagation()
+  notifStore.deleteOne(id)
+}
+
+const handleMarkAllRead = () => {
+  notifStore.markAllRead()
 }
 
 const handleLogout = async () => {
@@ -187,6 +195,14 @@ onUnmounted(() => {
         <div class="upd-notif-header">
           <button class="upd-notif-back" @click="handleBackFromNotifications">&larr;</button>
           <span>通知</span>
+          <span class="upd-notif-header-spacer" />
+          <button
+            v-if="notifStore.unreadCount > 0"
+            class="upd-notif-mark-all"
+            @click="handleMarkAllRead"
+          >
+            全部已读
+          </button>
           <span v-if="notifStore.isConnected" class="upd-connected-dot" />
         </div>
 
@@ -202,7 +218,11 @@ onUnmounted(() => {
             :class="{ 'upd-notif-item--unread': !n.isRead }"
             @click="handleNotificationClick(n)"
           >
-            <div class="upd-notif-title">{{ n.title }}</div>
+            <div class="upd-notif-row1">
+              <span v-if="!n.isRead" class="upd-notif-dot" />
+              <div class="upd-notif-title">{{ n.title }}</div>
+              <button class="upd-notif-delete" @click="handleDeleteNotification($event, n.id)">×</button>
+            </div>
             <div v-if="n.content" class="upd-notif-content">{{ n.content }}</div>
             <div class="upd-notif-time">{{ formatTime(n.createdAt) }}</div>
           </div>
@@ -387,6 +407,25 @@ onUnmounted(() => {
   height: 6px;
   border-radius: 50%;
   background: #4ade80;
+  flex-shrink: 0;
+}
+
+.upd-notif-header-spacer {
+  flex: 1;
+}
+
+.upd-notif-mark-all {
+  border: none;
+  background: none;
+  color: rgba(100, 180, 255, 0.8);
+  font-size: 0.72rem;
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+}
+
+.upd-notif-mark-all:hover {
+  color: rgba(100, 180, 255, 1);
 }
 
 .upd-notif-empty {
@@ -417,7 +456,38 @@ onUnmounted(() => {
 }
 
 .upd-notif-item--unread {
-  background: rgba(100, 180, 255, 0.06);
+  background: rgba(100, 180, 255, 0.08);
+}
+
+.upd-notif-row1 {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.upd-notif-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3b82f6;
+  flex-shrink: 0;
+}
+
+.upd-notif-delete {
+  margin-left: auto;
+  border: none;
+  background: none;
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0 0.2rem;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+
+.upd-notif-delete:hover {
+  color: rgba(255, 100, 100, 0.8);
 }
 
 .upd-notif-title {
@@ -516,6 +586,26 @@ onUnmounted(() => {
 
 .upd-light .upd-notif-item--unread {
   background: #eff6ff;
+}
+
+.upd-light .upd-notif-dot {
+  background: #3b82f6;
+}
+
+.upd-light .upd-notif-delete {
+  color: rgba(0, 0, 0, 0.2);
+}
+
+.upd-light .upd-notif-delete:hover {
+  color: rgba(220, 38, 38, 0.7);
+}
+
+.upd-light .upd-notif-mark-all {
+  color: rgba(37, 99, 235, 0.8);
+}
+
+.upd-light .upd-notif-mark-all:hover {
+  color: rgba(37, 99, 235, 1);
 }
 
 .upd-light .upd-notif-title {

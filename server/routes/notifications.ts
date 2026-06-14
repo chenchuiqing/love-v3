@@ -4,6 +4,7 @@ import { streamSSE } from 'hono/streaming'
 import { requireUserAuth, type AppVariables } from '../auth'
 import { addListener, removeListener } from '../sse'
 import {
+  deleteNotification,
   getUnreadCount,
   listNotificationsByUserId,
   markAllNotificationsRead,
@@ -74,4 +75,14 @@ notificationRoutes.put('/notifications/:id/read', requireUserAuth, (c) => {
     return c.json({ message: '通知不存在' }, 404)
   }
   return c.json({ data: { ok: true } })
+})
+
+notificationRoutes.delete('/notifications/:id', requireUserAuth, (c) => {
+  const session = c.get('userSession')
+  const id = c.req.param('id')
+  const ok = deleteNotification(id, session.userId)
+  if (!ok) {
+    return c.json({ message: '通知不存在' }, 404)
+  }
+  return c.body(null, 204)
 })

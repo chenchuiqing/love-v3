@@ -31,3 +31,9 @@ export const markNotificationRead = async (id: string): Promise<void> => {
     method: 'PUT',
   })
 }
+
+export const deleteNotification = async (id: string): Promise<void> => {
+  await apiRequest<void>(`/api/notifications/${id}`, {
+    method: 'DELETE',
+  })
+}

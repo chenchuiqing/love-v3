@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, shallowRef } from 'vue'
 
-import { fetchNotifications, fetchUnreadCount, markAllNotificationsRead } from '@/api/notifications'
+import { deleteNotification, fetchNotifications, fetchUnreadCount, markAllNotificationsRead, markNotificationRead } from '@/api/notifications'
 import type { AppNotification } from '@/types/memory'
 
 export const useNotificationStore = defineStore('notifications', () => {
@@ -93,6 +93,35 @@ export const useNotificationStore = defineStore('notifications', () => {
     }
   }
 
+  const markOneRead = async (id: string) => {
+    try {
+      await markNotificationRead(id)
+      const n = notifications.value.find((x) => x.id === id)
+      if (n && !n.isRead) {
+        n.isRead = true
+        unreadCount.value = Math.max(0, unreadCount.value - 1)
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const deleteOne = async (id: string) => {
+    try {
+      await deleteNotification(id)
+      const idx = notifications.value.findIndex((x) => x.id === id)
+      if (idx !== -1) {
+        const wasUnread = !notifications.value[idx].isRead
+        notifications.value.splice(idx, 1)
+        if (wasUnread) {
+          unreadCount.value = Math.max(0, unreadCount.value - 1)
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   return {
     unreadCount,
     notifications,
@@ -102,5 +131,7 @@ export const useNotificationStore = defineStore('notifications', () => {
     connect,
     disconnect,
     markAllRead,
+    markOneRead,
+    deleteOne,
   }
 })

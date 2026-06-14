@@ -42,6 +42,10 @@ const markAllReadStmt = db.prepare(
   'UPDATE notifications SET is_read = 1 WHERE user_id = ?1 AND is_read = 0',
 )
 
+const deleteStmt = db.prepare(
+  'DELETE FROM notifications WHERE id = ?1 AND user_id = ?2',
+)
+
 interface CreateNotificationParams {
   userId: string
   type: NotificationType
@@ -99,4 +103,9 @@ export const markNotificationRead = (id: string, userId: string): boolean => {
 export const markAllNotificationsRead = (userId: string): number => {
   const result = markAllReadStmt.run(userId)
   return result.changes ?? 0
+}
+
+export const deleteNotification = (id: string, userId: string): boolean => {
+  const result = deleteStmt.run(id, userId)
+  return (result.changes ?? 0) > 0
 }

@@ -17,3 +17,8 @@ export const markNotificationRead = async (id) => {
         method: 'PUT',
     });
 };
+export const deleteNotification = async (id) => {
+    await apiRequest(`/api/notifications/${id}`, {
+        method: 'DELETE',
+    });
+};
