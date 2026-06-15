@@ -14,104 +14,22 @@ const pageTitle = computed(() => {
 </script>
 
 <template>
-  <div class="publish-layout">
-    <header class="publish-header">
+  <div class="min-h-screen bg-[#f4f6fb] text-[#1d2433]">
+    <header class="flex flex-wrap justify-between items-center gap-4 px-4 py-3 md:px-6 md:py-4 border-b border-[#d8deea] bg-white">
       <div>
-        <p class="brand">记忆点管理</p>
-        <h1 class="title">{{ pageTitle }}</h1>
+        <p class="m-0 text-[#5a6377] text-[0.85rem]">记忆点管理</p>
+        <h1 class="m-0 mt-[0.2rem] text-[1.2rem]">{{ pageTitle }}</h1>
       </div>
-      <nav class="actions">
-        <RouterLink class="link" :to="{ name: 'PublishMemoryList' }">列表</RouterLink>
-        <RouterLink class="link" :to="{ name: 'PublishMemoryCreate' }">新增</RouterLink>
-        <span class="divider">|</span>
-        <RouterLink class="link back" :to="{ name: 'Home' }">返回星球</RouterLink>
+      <nav class="flex items-center gap-2 md:gap-3">
+        <RouterLink class="text-[#304f9f] no-underline font-medium text-sm md:text-[0.88rem]" :to="{ name: 'PublishMemoryList' }">列表</RouterLink>
+        <RouterLink class="text-[#304f9f] no-underline font-medium text-sm md:text-[0.88rem]" :to="{ name: 'PublishMemoryCreate' }">新增</RouterLink>
+        <span class="text-[#d1d5db] text-[0.85rem] select-none">|</span>
+        <RouterLink class="text-[#6b7280] no-underline font-normal text-xs md:text-[0.85rem]" :to="{ name: 'Home' }">返回星球</RouterLink>
         <UserProfileDropdown theme="light" />
       </nav>
     </header>
-    <main class="publish-main">
+    <main class="max-w-[1024px] mx-auto px-3 py-3 md:px-[1.2rem] md:py-[1.2rem]">
       <RouterView />
     </main>
   </div>
 </template>
-
-<style scoped>
-.publish-layout {
-  min-height: 100vh;
-  background: #f4f6fb;
-  color: #1d2433;
-}
-
-.publish-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem 1.5rem;
-  border-bottom: 1px solid #d8deea;
-  background: #ffffff;
-}
-
-.brand {
-  margin: 0;
-  color: #5a6377;
-  font-size: 0.85rem;
-}
-
-.title {
-  margin: 0.2rem 0 0;
-  font-size: 1.2rem;
-}
-
-.actions {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.link {
-  color: #304f9f;
-  text-decoration: none;
-  font-weight: 500;
-}
-
-.link.back {
-  color: #6b7280;
-  font-weight: 400;
-  font-size: 0.85rem;
-}
-
-.divider {
-  color: #d1d5db;
-  font-size: 0.85rem;
-  user-select: none;
-}
-
-.publish-main {
-  max-width: 1024px;
-  margin: 0 auto;
-  padding: 1.2rem;
-}
-
-@media (max-width: 768px) {
-  .publish-header {
-    flex-wrap: wrap;
-    padding: 0.75rem 1rem;
-  }
-
-  .actions {
-    gap: 0.5rem;
-  }
-
-  .link {
-    font-size: 0.88rem;
-  }
-
-  .link.back {
-    font-size: 0.8rem;
-  }
-
-  .publish-main {
-    padding: 0.75rem;
-  }
-}
-</style>

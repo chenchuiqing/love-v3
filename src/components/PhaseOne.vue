@@ -419,7 +419,7 @@ onBeforeUnmount(() => {
 .hint-layer {
   position: absolute;
   left: 50%;
-  bottom: max(1.6rem, calc(env(safe-area-inset-bottom) + 1rem));
+  bottom: max(3rem, calc(env(safe-area-inset-bottom) + 1.5rem));
   z-index: 10;
   display: flex;
   flex-direction: column;

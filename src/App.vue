@@ -101,18 +101,22 @@ const applyScrollModeByRoute = (publishMode: boolean) => {
   if (!appRoot) return
 
   if (publishMode) {
-    document.documentElement.style.overflow = 'auto'
-    document.body.style.overflow = 'auto'
+    document.documentElement.style.overscrollBehavior = ''
+    document.body.style.overscrollBehavior = ''
+    document.body.style.overflow = ''
     appRoot.style.overflow = 'visible'
     appRoot.style.height = 'auto'
     appRoot.style.minHeight = '100%'
     return
   }
 
-  document.documentElement.style.overflow = 'hidden'
-  document.body.style.overflow = 'hidden'
-  appRoot.style.overflow = 'hidden'
-  appRoot.style.height = '100%'
+  // 主页模式:
+  // overscroll-behavior:none 防弹性滚动（已在 CSS 中设置）
+  // <main> 通过 fixed inset-0 填满视口，overflow:hidden 约束画布
+  // top-bar 在 <main> 外部，iOS 不会裁剪
+  document.body.style.overflow = ''
+  appRoot.style.overflow = ''
+  appRoot.style.height = ''
   appRoot.style.minHeight = ''
 }
 
@@ -150,10 +154,12 @@ watch(() => route.query.memoryId, (memoryId) => {
 onUnmounted(() => {
   document.removeEventListener('fullscreenchange', syncFullscreenState);
   document.removeEventListener('webkitfullscreenchange', syncFullscreenState);
-  document.documentElement.style.overflow = ''
+  document.documentElement.style.overscrollBehavior = ''
+  document.body.style.overscrollBehavior = ''
   document.body.style.overflow = ''
   const appRoot = document.getElementById('app')
   if (appRoot) {
+    appRoot.style.overflow = ''
     appRoot.style.height = ''
     appRoot.style.minHeight = ''
   }
@@ -163,100 +169,94 @@ onUnmounted(() => {
 <template>
   <RouterView v-if="isPublishRoute" />
 
-  <main v-else ref="appRef" class="app-root">
-    <!-- 顶部工具栏 -->
-    <div class="top-bar">
+  <template v-else>
+    <!--
+      顶部工具栏 — 在 overflow:hidden 容器外部
+      iOS Safari 经典 bug: overflow:hidden 会裁剪 position:fixed 子元素
+      放在 <main> 外部（作为 #app 的直接子元素）可避免此问题
+    -->
+    <div
+      class="fixed z-[9999] flex items-center gap-2"
+      style="top: calc(1rem + env(safe-area-inset-top, 0px)); right: calc(1rem + env(safe-area-inset-right, 0px));"
+    >
       <UserProfileDropdown />
-      <button v-if="isFullscreenSupported" class="top-bar-btn" @click="toggleFullscreen">
+      <button
+        v-if="isFullscreenSupported"
+        class="px-3 py-[0.45rem] border border-[rgba(163,218,255,0.45)] rounded-full bg-[rgba(4,20,48,0.55)] text-[rgba(236,247,255,0.95)] text-xs tracking-[0.08em] backdrop-blur-lg cursor-pointer transition-all duration-[220ms] ease hover:border-[rgba(188,229,255,0.82)] hover:shadow-[0_0_16px_rgba(123,193,255,0.35)] hover:-translate-y-px"
+        @click="toggleFullscreen"
+      >
         {{ isFullscreen ? '退出全屏' : '进入全屏' }}
       </button>
     </div>
 
-    <!-- 阶段过渡光芒 -->
-    <Transition name="flash">
-      <div v-if="isTransitioning" class="transition-flash"></div>
-    </Transition>
+    <main ref="appRef" class="fixed top-0 left-0 right-0 bg-[#000010] text-white overflow-hidden" style="height: 100dvh;">
+      <!-- 阶段过渡光芒 -->
+      <Transition name="flash">
+        <div v-if="isTransitioning" class="transition-flash"></div>
+      </Transition>
 
-    <!-- 第一阶段：初见（星尘环绕） -->
-    <Transition name="phase-fade">
-      <PhaseOne 
-        v-if="currentPhase === 1" 
-        @complete="handlePhaseOneComplete" 
-      />
-    </Transition>
-    
-    <!-- 第二阶段：记忆星球 -->
-    <Transition name="phase-fade">
-      <PhaseTwo
-        v-if="currentPhase === 2"
-        :resume-exploring="phaseTwoResume"
-        :initial-visited-ids="phaseTwoResume ? Array.from(visitedMemoryIds) : undefined"
-        @visited-update="handleVisitedUpdate"
-        @complete="handlePhaseTwoComplete"
-      />
-    </Transition>
+      <!-- 第一阶段：初见（星尘环绕） -->
+      <Transition name="phase-fade">
+        <PhaseOne
+          v-if="currentPhase === 1"
+          @complete="handlePhaseOneComplete"
+        />
+      </Transition>
 
-    <!-- 第三阶段：手绘爱心 -->
-    <Transition name="phase-fade">
-      <PhaseThree
-        v-if="currentPhase === 3"
-        @act1-complete="handleAct1Complete"
-        @back-to-planet="handleBackToPlanet"
-      />
-    </Transition>
+      <!-- 第二阶段：记忆星球 -->
+      <Transition name="phase-fade">
+        <PhaseTwo
+          v-if="currentPhase === 2"
+          :resume-exploring="phaseTwoResume"
+          :initial-visited-ids="phaseTwoResume ? Array.from(visitedMemoryIds) : undefined"
+          @visited-update="handleVisitedUpdate"
+          @complete="handlePhaseTwoComplete"
+        />
+      </Transition>
 
-    <!-- 全局浮动音乐播放器 -->
+      <!-- 第三阶段：手绘爱心 -->
+      <Transition name="phase-fade">
+        <PhaseThree
+          v-if="currentPhase === 3"
+          @act1-complete="handleAct1Complete"
+          @back-to-planet="handleBackToPlanet"
+        />
+      </Transition>
+    </main>
+
+    <!-- 全局浮动音乐播放器 — 也在 main 外部 -->
     <FloatingMusicPlayer />
-  </main>
+  </template>
 </template>
 
 <style>
+/*
+ * iOS Safari 兼容说明:
+ * - html/body 只设 overscroll-behavior:none 防弹性滚动，不设 overflow:hidden
+ * - <main> 使用 fixed inset-0 + overflow:hidden 填满视口并约束 Three.js 画布
+ * - top-bar (fixed) 与 <main> 是兄弟节点，不会被 overflow:hidden 裁剪
+ * - #app 不设任何 overflow/position 限制
+ */
 html,
 body,
 #app {
   width: 100%;
-  height: 100%;
   margin: 0;
   padding: 0;
-  overflow: hidden;
 }
 
-.app-root {
-  position: relative;
-  width: 100%;
-  height: 100%;
+html {
+  overscroll-behavior: none;
   background: #000010;
-  color: #fff;
-  overflow: hidden;
 }
 
-.top-bar-btn {
-  padding: 0.45rem 0.8rem;
-  border: 1px solid rgba(163, 218, 255, 0.45);
-  border-radius: 999px;
-  background: rgba(4, 20, 48, 0.55);
-  color: rgba(236, 247, 255, 0.95);
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  backdrop-filter: blur(8px);
-  cursor: pointer;
-  transition: all 220ms ease;
+body {
+  overscroll-behavior: none;
+  background: #000010;
 }
 
-.top-bar-btn:hover {
-  border-color: rgba(188, 229, 255, 0.82);
-  box-shadow: 0 0 16px rgba(123, 193, 255, 0.35);
-  transform: translateY(-1px);
-}
-
-.top-bar {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+#app {
+  background: #000010;
 }
 
 /* 阶段切换淡入淡出 */
