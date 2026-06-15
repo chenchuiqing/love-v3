@@ -439,18 +439,36 @@ onMounted(async () => {
         </label>
 
         <div class="upload-row">
-          <label class="upload-field">
-            上传图片（最多 5 张，可多选）
-            <input type="file" accept="image/*" multiple @change="handleUploadImage" />
-          </label>
-          <label class="upload-field">
-            上传音频
-            <input type="file" accept="audio/mpeg,audio/mp3" @change="handleUploadAudio" />
-          </label>
-          <label class="upload-field">
-            上传视频
-            <input type="file" accept="video/*" @change="handleUploadVideo" />
-          </label>
+          <div class="upload-field">
+            <span>上传图片（最多 5 张，可多选）</span>
+            <div class="file-input-wrap">
+              <label class="file-input-label" tabindex="0">
+                <input type="file" accept="image/*" multiple @change="handleUploadImage" />
+                <span class="file-input-btn">选择图片</span>
+              </label>
+              <span class="file-input-text">{{ getSanitizedImageUrls().length > 0 ? `已上传 ${getSanitizedImageUrls().length} 张` : '未选择任何文件' }}</span>
+            </div>
+          </div>
+          <div class="upload-field">
+            <span>上传音频</span>
+            <div class="file-input-wrap">
+              <label class="file-input-label" tabindex="0">
+                <input type="file" accept="audio/mpeg,audio/mp3" @change="handleUploadAudio" />
+                <span class="file-input-btn">选择音频</span>
+              </label>
+              <span class="file-input-text">{{ form.audioUrl ? '已上传音频' : '未选择任何文件' }}</span>
+            </div>
+          </div>
+          <div class="upload-field">
+            <span>上传视频</span>
+            <div class="file-input-wrap">
+              <label class="file-input-label" tabindex="0">
+                <input type="file" accept="video/*" @change="handleUploadVideo" />
+                <span class="file-input-btn">选择视频</span>
+              </label>
+              <span class="file-input-text">{{ form.videoUrl ? '已上传视频' : '未选择任何文件' }}</span>
+            </div>
+          </div>
         </div>
 
         <fieldset class="advanced">
@@ -484,18 +502,25 @@ onMounted(async () => {
             <p class="hint">图片（{{ getSanitizedImageUrls().length }} 张）</p>
             <div class="media-list">
               <div v-for="(url, index) in getSanitizedImageUrls()" :key="`${url}-${index}`" class="media-item">
+                <img class="media-preview" :src="url" alt="" />
                 <span class="hint media-url">{{ url }}</span>
                 <button type="button" class="danger-button" @click="removeImageAt(index)">删除</button>
               </div>
             </div>
           </div>
           <div v-if="form.audioUrl" class="media-block">
-            <p class="hint">音频链接：{{ form.audioUrl }}</p>
-            <button type="button" class="danger-button" @click="clearAudio">删除音频</button>
+            <p class="hint">音频</p>
+            <div class="media-preview-row">
+              <audio :src="form.audioUrl" controls class="audio-player"></audio>
+              <button type="button" class="danger-button" @click="clearAudio">删除</button>
+            </div>
           </div>
           <div v-if="form.videoUrl" class="media-block">
-            <p class="hint">视频链接：{{ form.videoUrl }}</p>
-            <button type="button" class="danger-button" @click="clearVideo">删除视频</button>
+            <p class="hint">视频</p>
+            <div class="media-preview-row">
+              <video :src="form.videoUrl" controls class="video-player"></video>
+              <button type="button" class="danger-button" @click="clearVideo">删除</button>
+            </div>
           </div>
         </div>
 
@@ -611,6 +636,41 @@ textarea {
   font-size: 0.82rem;
 }
 
+.file-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.file-input-wrap input[type='file'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.file-input-label {
+  cursor: pointer;
+}
+
+.file-input-btn {
+  display: inline-block;
+  border: none;
+  border-radius: 0.5rem;
+  background: #243b76;
+  color: #fff;
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.file-input-text {
+  font-size: 0.85rem;
+  color: #5d6989;
+}
+
 .advanced {
   border: 1px dashed #b9c5df;
   border-radius: 0.6rem;
@@ -717,9 +777,34 @@ button:disabled {
 
 .media-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
   gap: 0.5rem;
   align-items: center;
+}
+
+.media-preview {
+  width: 48px;
+  height: 48px;
+  border-radius: 0.4rem;
+  object-fit: cover;
+  border: 1px solid #d4dbeb;
+}
+
+.media-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.audio-player {
+  max-width: 320px;
+  height: 36px;
+}
+
+.video-player {
+  max-width: 100%;
+  max-height: 240px;
+  border-radius: 0.4rem;
 }
 
 .media-url {
