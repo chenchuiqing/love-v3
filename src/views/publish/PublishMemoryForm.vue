@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import type { Memory, MemoryType, ParticleTheme } from '@/types/memory'
@@ -93,6 +93,23 @@ const loading = ref(false)
 const submitting = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
+let successTimer: ReturnType<typeof setTimeout> | null = null
+
+const showSuccess = (msg: string, duration = 4000) => {
+  if (successTimer) clearTimeout(successTimer)
+  successMessage.value = msg
+  successTimer = setTimeout(() => {
+    successMessage.value = ''
+    successTimer = null
+  }, duration)
+}
+
+const clearSuccess = () => {
+  if (successTimer) clearTimeout(successTimer)
+  successMessage.value = ''
+  successTimer = null
+}
+
 const isUploadingImage = ref(false)
 const isUploadingAudio = ref(false)
 const isUploadingVideo = ref(false)
@@ -203,7 +220,7 @@ const refillAutoPosition = () => {
 
 const uploadFile = async (file: File, target: 'audio' | 'video') => {
   errorMessage.value = ''
-  successMessage.value = ''
+  clearSuccess()
   if (target === 'audio') {
     isUploadingAudio.value = true
   } else {
@@ -217,9 +234,9 @@ const uploadFile = async (file: File, target: 'audio' | 'video') => {
       form.videoUrl = url
     }
     const targetLabel = target === 'audio' ? '音频' : '视频'
-    successMessage.value = `${targetLabel}上传成功，链接已自动填入表单`
+    showSuccess(`${targetLabel}上传成功，链接已自动填入表单`)
   } catch (error) {
-    successMessage.value = ''
+    clearSuccess()
     if (error instanceof Error) {
       errorMessage.value = error.message
     } else {
@@ -240,7 +257,7 @@ const handleUploadImage = async (event: Event) => {
   if (files.length === 0) return
 
   errorMessage.value = ''
-  successMessage.value = ''
+  clearSuccess()
   const existing = getSanitizedImageUrls()
   const remain = MAX_IMAGE_COUNT - existing.length
   if (remain <= 0) {
@@ -261,16 +278,18 @@ const handleUploadImage = async (event: Event) => {
     }
     form.imageUrls = [...existing, ...uploaded].slice(0, MAX_IMAGE_COUNT)
     form.imageUrl = form.imageUrls[0] ?? ''
+    let msg = ''
     if (uploaded.length > 0) {
-      successMessage.value = `图片上传成功，已新增 ${uploaded.length} 张`
+      msg = `图片上传成功，已新增 ${uploaded.length} 张`
     } else {
-      successMessage.value = '图片已存在，未新增'
+      msg = '图片已存在，未新增'
     }
     if (files.length > selected.length) {
-      successMessage.value += `（最多保留 ${MAX_IMAGE_COUNT} 张）`
+      msg += `（最多保留 ${MAX_IMAGE_COUNT} 张）`
     }
+    showSuccess(msg)
   } catch (error) {
-    successMessage.value = ''
+    clearSuccess()
     if (error instanceof Error) {
       errorMessage.value = error.message
     } else {
@@ -372,6 +391,10 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+})
+
+onUnmounted(() => {
+  if (successTimer) clearTimeout(successTimer)
 })
 </script>
 
@@ -593,12 +616,6 @@ onMounted(async () => {
           {{ errorMessage }}
         </div>
         <div
-          v-if="successMessage"
-          class="px-4 py-3 bg-[#f0fdf4] border border-[#bbf7d0] text-[#1e7a35] text-sm rounded-lg"
-        >
-          {{ successMessage }}
-        </div>
-        <div
           v-if="isUploadingImage || isUploadingAudio || isUploadingVideo"
           class="flex items-center gap-2 px-4 py-3 bg-[#f8faff] border border-[#d8dfee] text-[#5d6989] text-sm rounded-lg"
         >
@@ -722,5 +739,40 @@ onMounted(async () => {
       :memory="previewDetailMemory"
       @close="previewDetailMemory = null"
     />
+
+    <!-- Success Toast -->
+    <Teleport to="body">
+      <Transition name="toast">
+        <div
+          v-if="successMessage"
+          class="fixed z-[9999] flex items-center gap-2.5 px-5 py-3 bg-white border border-[#d1f0d8] rounded-xl shadow-lg"
+          style="top: 24px; left: 50%; transform: translateX(-50%);"
+        >
+          <span class="w-5 h-5 rounded-full bg-[#22c55e] flex items-center justify-center flex-shrink-0">
+            <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+            </svg>
+          </span>
+          <span class="text-sm text-[#1d2433]">{{ successMessage }}</span>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
+
+<style>
+.toast-enter-active {
+  transition: all 0.3s ease-out;
+}
+.toast-leave-active {
+  transition: all 0.25s ease-in;
+}
+.toast-enter-from {
+  opacity: 0;
+  transform: translateY(-12px) translateX(-50%);
+}
+.toast-leave-to {
+  opacity: 0;
+  transform: translateY(-8px) translateX(-50%);
+}
+</style>
