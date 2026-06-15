@@ -9,7 +9,7 @@ const memories = ref<Memory[]>([])
 const loading = ref(false)
 const errorMessage = ref('')
 const deletingId = ref('')
-const sortOrder = ref<'asc' | 'desc'>('asc')
+const sortOrder = ref<'asc' | 'desc'>('desc')
 const confirmVisible = ref(false)
 const confirmTarget = ref<{ id: string; title: string } | null>(null)
 
@@ -134,7 +134,7 @@ onMounted(() => {
             r {{ item.orbitRadius.toFixed(2) }}
           </td>
           <td data-label="操作" class="actions-cell">
-            <a :href="`/?memory=${item.id}`" target="_blank" rel="noreferrer">预览</a>
+            <a :href="`/?memoryId=${item.id}`">预览</a>
             <RouterLink :to="{ name: 'PublishMemoryEdit', params: { id: item.id } }">编辑</RouterLink>
             <button
               type="button"
