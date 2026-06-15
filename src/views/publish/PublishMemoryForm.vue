@@ -448,7 +448,7 @@ onUnmounted(() => {
               <input
                 v-model.trim="form.date"
                 required
-                placeholder="例如 2025-05-20"
+                placeholder="例如 2026.05.09"
                 class="border border-[#ccd5e8] rounded-lg px-3.5 py-2.5 text-sm text-[#1d2433] font-normal placeholder:text-[#b0bdd4] focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
               />
             </label>
