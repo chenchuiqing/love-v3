@@ -103,6 +103,7 @@ const applyScrollModeByRoute = (publishMode: boolean) => {
   if (publishMode) {
     document.documentElement.style.overflow = 'auto'
     document.body.style.overflow = 'auto'
+    appRoot.style.overflow = 'visible'
     appRoot.style.height = 'auto'
     appRoot.style.minHeight = '100%'
     return
@@ -110,6 +111,7 @@ const applyScrollModeByRoute = (publishMode: boolean) => {
 
   document.documentElement.style.overflow = 'hidden'
   document.body.style.overflow = 'hidden'
+  appRoot.style.overflow = 'hidden'
   appRoot.style.height = '100%'
   appRoot.style.minHeight = ''
 }
