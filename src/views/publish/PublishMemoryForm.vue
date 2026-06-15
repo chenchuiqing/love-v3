@@ -376,176 +376,335 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="panel">
-    <p v-if="loading" class="hint">加载中...</p>
-    <div v-else class="layout">
-      <form class="form" @submit.prevent="handleSubmit">
-        <label>
-          <span class="field-label">标题<span class="required">*</span></span>
-          <input v-model.trim="form.title" required />
-        </label>
+  <div class="flex flex-col gap-4">
+    <!-- Loading -->
+    <div v-if="loading" class="flex items-center justify-center py-16 text-[#63708c] text-sm">
+      <svg class="w-5 h-5 mr-2.5 animate-spin" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+      </svg>
+      加载中...
+    </div>
 
-        <div class="row">
-          <label>
-            类型
-            <select v-model="form.type">
-              <option
-                v-for="item in memoryTypeOptions"
-                :key="item.value"
-                :value="item.value"
-              >
-                {{ item.label }}
-              </option>
-            </select>
+    <!-- Main layout: Form + Preview -->
+    <div v-else class="grid grid-cols-1 lg:grid-cols-[1fr_380px] xl:grid-cols-[1fr_420px] gap-4 xl:gap-6 items-start">
+      <!-- ============ Form Card ============ -->
+      <form class="bg-white border border-[#d5ddee] rounded-xl p-5 md:p-6 flex flex-col gap-5 shadow-sm" @submit.prevent="handleSubmit">
+        <!-- Section: Basic Info -->
+        <div class="flex flex-col gap-4">
+          <h3 class="text-sm font-semibold text-[#2a3a63] uppercase tracking-wide m-0 pb-2 border-b border-[#ecf0f8]">基本信息</h3>
+
+          <label class="flex flex-col gap-1.5 text-sm font-medium text-[#4a597f]">
+            <span>标题 <span class="text-[#b72929]">*</span></span>
+            <input
+              v-model.trim="form.title"
+              required
+              class="border border-[#ccd5e8] rounded-lg px-3.5 py-2.5 text-sm text-[#1d2433] font-normal placeholder:text-[#b0bdd4] focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
+            />
           </label>
 
-          <label>
-            <span class="field-label">日期<span class="required">*</span></span>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label class="flex flex-col gap-1.5 text-sm font-medium text-[#4a597f]">
+              类型
+              <select
+                v-model="form.type"
+                class="border border-[#ccd5e8] rounded-lg px-3.5 py-2.5 text-sm text-[#1d2433] font-normal bg-white focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
+              >
+                <option
+                  v-for="item in memoryTypeOptions"
+                  :key="item.value"
+                  :value="item.value"
+                >
+                  {{ item.label }}
+                </option>
+              </select>
+            </label>
+
+            <label class="flex flex-col gap-1.5 text-sm font-medium text-[#4a597f]">
+              <span>日期 <span class="text-[#b72929]">*</span></span>
+              <input
+                v-model.trim="form.date"
+                required
+                placeholder="例如 2025-05-20"
+                class="border border-[#ccd5e8] rounded-lg px-3.5 py-2.5 text-sm text-[#1d2433] font-normal placeholder:text-[#b0bdd4] focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
+              />
+            </label>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label class="flex flex-col gap-1.5 text-sm font-medium text-[#4a597f]">
+              颜色
+              <div class="flex items-center gap-2.5">
+                <input
+                  v-model.trim="form.color"
+                  type="color"
+                  class="w-10 h-10 rounded-lg border border-[#ccd5e8] cursor-pointer p-0.5 bg-white"
+                />
+                <input
+                  v-model.trim="form.color"
+                  class="flex-1 border border-[#ccd5e8] rounded-lg px-3.5 py-2.5 text-sm text-[#1d2433] font-mono font-normal focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
+                />
+              </div>
+            </label>
+
+            <label class="flex flex-col gap-1.5 text-sm font-medium text-[#4a597f]">
+              粒子主题
+              <select
+                v-model="form.theme"
+                class="border border-[#ccd5e8] rounded-lg px-3.5 py-2.5 text-sm text-[#1d2433] font-normal bg-white focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
+              >
+                <option
+                  v-for="item in particleThemeOptions"
+                  :key="item.value"
+                  :value="item.value"
+                >
+                  {{ item.label }}
+                </option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <!-- Section: Content -->
+        <div class="flex flex-col gap-4">
+          <h3 class="text-sm font-semibold text-[#2a3a63] uppercase tracking-wide m-0 pb-2 border-b border-[#ecf0f8]">内容</h3>
+
+          <label class="flex flex-col gap-1.5 text-sm font-medium text-[#4a597f]">
+            文案
+            <textarea
+              v-model.trim="form.text"
+              rows="4"
+              class="border border-[#ccd5e8] rounded-lg px-3.5 py-2.5 text-sm text-[#1d2433] font-normal resize-y placeholder:text-[#b0bdd4] focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
+            ></textarea>
+          </label>
+
+          <label class="flex flex-col gap-1.5 text-sm font-medium text-[#4a597f]">
+            地点
             <input
-              v-model.trim="form.date"
-              required
-              placeholder="例如 2025-05-20"
+              v-model.trim="form.location"
+              class="border border-[#ccd5e8] rounded-lg px-3.5 py-2.5 text-sm text-[#1d2433] font-normal placeholder:text-[#b0bdd4] focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
             />
           </label>
         </div>
 
-        <div class="row">
-          <label>
-            颜色
-            <input v-model.trim="form.color" type="color" />
-          </label>
-          <label>
-            粒子主题
-            <select v-model="form.theme">
-              <option
-                v-for="item in particleThemeOptions"
-                :key="item.value"
-                :value="item.value"
-              >
-                {{ item.label }}
-              </option>
-            </select>
-          </label>
-        </div>
+        <!-- Section: Media Upload -->
+        <div class="flex flex-col gap-4">
+          <h3 class="text-sm font-semibold text-[#2a3a63] uppercase tracking-wide m-0 pb-2 border-b border-[#ecf0f8]">媒体上传</h3>
 
-        <label>
-          文案
-          <textarea v-model.trim="form.text" rows="4"></textarea>
-        </label>
-
-        <label>
-          地点
-          <input v-model.trim="form.location" />
-        </label>
-
-        <div class="upload-row">
-          <div class="upload-field">
-            <span>上传图片（最多 5 张，可多选）</span>
-            <div class="file-input-wrap">
-              <label class="file-input-label" tabindex="0">
-                <input type="file" accept="image/*" multiple @change="handleUploadImage" />
-                <span class="file-input-btn">选择图片</span>
+          <!-- Images -->
+          <div class="flex flex-col gap-1.5">
+            <span class="text-sm font-medium text-[#4a597f]">上传图片（最多 {{ MAX_IMAGE_COUNT }} 张，可多选）</span>
+            <div class="flex items-center gap-3">
+              <label class="inline-flex items-center px-4 py-2.5 bg-[#243b76] text-white text-sm font-medium rounded-lg hover:bg-[#1a2d5e] transition-colors cursor-pointer shadow-sm" tabindex="0">
+                <input type="file" accept="image/*" multiple class="sr-only" @change="handleUploadImage" />
+                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                选择图片
               </label>
-              <span class="file-input-text">{{ getSanitizedImageUrls().length > 0 ? `已上传 ${getSanitizedImageUrls().length} 张` : '未选择任何文件' }}</span>
+              <span class="text-sm text-[#5d6989]">
+                {{ getSanitizedImageUrls().length > 0 ? `已上传 ${getSanitizedImageUrls().length} 张` : '未选择任何文件' }}
+              </span>
             </div>
           </div>
-          <div class="upload-field">
-            <span>上传音频</span>
-            <div class="file-input-wrap">
-              <label class="file-input-label" tabindex="0">
-                <input type="file" accept="audio/mpeg,audio/mp3" @change="handleUploadAudio" />
-                <span class="file-input-btn">选择音频</span>
+
+          <!-- Audio -->
+          <div class="flex flex-col gap-1.5">
+            <span class="text-sm font-medium text-[#4a597f]">上传音频</span>
+            <div class="flex items-center gap-3">
+              <label class="inline-flex items-center px-4 py-2.5 bg-[#243b76] text-white text-sm font-medium rounded-lg hover:bg-[#1a2d5e] transition-colors cursor-pointer shadow-sm" tabindex="0">
+                <input type="file" accept="audio/mpeg,audio/mp3" class="sr-only" @change="handleUploadAudio" />
+                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                </svg>
+                选择音频
               </label>
-              <span class="file-input-text">{{ form.audioUrl ? '已上传音频' : '未选择任何文件' }}</span>
+              <span class="text-sm text-[#5d6989]">{{ form.audioUrl ? '已上传音频' : '未选择任何文件' }}</span>
             </div>
           </div>
-          <div class="upload-field">
-            <span>上传视频</span>
-            <div class="file-input-wrap">
-              <label class="file-input-label" tabindex="0">
-                <input type="file" accept="video/*" @change="handleUploadVideo" />
-                <span class="file-input-btn">选择视频</span>
+
+          <!-- Video -->
+          <div class="flex flex-col gap-1.5">
+            <span class="text-sm font-medium text-[#4a597f]">上传视频</span>
+            <div class="flex items-center gap-3">
+              <label class="inline-flex items-center px-4 py-2.5 bg-[#243b76] text-white text-sm font-medium rounded-lg hover:bg-[#1a2d5e] transition-colors cursor-pointer shadow-sm" tabindex="0">
+                <input type="file" accept="video/*" class="sr-only" @change="handleUploadVideo" />
+                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.106.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                选择视频
               </label>
-              <span class="file-input-text">{{ form.videoUrl ? '已上传视频' : '未选择任何文件' }}</span>
+              <span class="text-sm text-[#5d6989]">{{ form.videoUrl ? '已上传视频' : '未选择任何文件' }}</span>
             </div>
           </div>
         </div>
 
-        <fieldset class="advanced">
-          <legend>星球位置高级设置</legend>
-          <div class="row">
-            <label>
+        <!-- Section: Position (Advanced) -->
+        <fieldset class="border border-dashed border-[#b9c5df] rounded-xl p-4 md:p-5 m-0 flex flex-col gap-4">
+          <legend class="px-2 text-sm font-semibold text-[#4a597f]">星球位置高级设置</legend>
+
+          <div class="grid grid-cols-3 gap-3">
+            <label class="flex flex-col gap-1 text-xs font-medium text-[#5a6377]">
               theta
-              <input v-model.number="form.theta" type="number" step="0.0001" />
+              <input
+                v-model.number="form.theta"
+                type="number"
+                step="0.0001"
+                class="border border-[#ccd5e8] rounded-lg px-3 py-2 text-sm text-[#1d2433] font-mono font-normal focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
+              />
             </label>
-            <label>
+            <label class="flex flex-col gap-1 text-xs font-medium text-[#5a6377]">
               phi
-              <input v-model.number="form.phi" type="number" step="0.0001" />
+              <input
+                v-model.number="form.phi"
+                type="number"
+                step="0.0001"
+                class="border border-[#ccd5e8] rounded-lg px-3 py-2 text-sm text-[#1d2433] font-mono font-normal focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
+              />
             </label>
-            <label>
+            <label class="flex flex-col gap-1 text-xs font-medium text-[#5a6377]">
               orbitRadius
-              <input v-model.number="form.orbitRadius" type="number" step="0.0001" />
+              <input
+                v-model.number="form.orbitRadius"
+                type="number"
+                step="0.0001"
+                class="border border-[#ccd5e8] rounded-lg px-3 py-2 text-sm text-[#1d2433] font-mono font-normal focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
+              />
             </label>
           </div>
-          <button type="button" @click="refillAutoPosition">重新自动分布</button>
+
+          <button
+            type="button"
+            class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-[#4a597f] bg-white border border-[#ccd5e8] rounded-lg hover:bg-[#f3f5f9] transition-colors cursor-pointer self-start"
+            @click="refillAutoPosition"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            重新自动分布
+          </button>
         </fieldset>
 
-        <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
-        <p v-if="successMessage" class="success">{{ successMessage }}</p>
-        <p class="hint" v-if="isUploadingImage || isUploadingAudio || isUploadingVideo">
+        <!-- Feedback Messages -->
+        <div
+          v-if="errorMessage"
+          class="px-4 py-3 bg-[#fef2f2] border border-[#fecaca] text-[#b72929] text-sm rounded-lg"
+        >
+          {{ errorMessage }}
+        </div>
+        <div
+          v-if="successMessage"
+          class="px-4 py-3 bg-[#f0fdf4] border border-[#bbf7d0] text-[#1e7a35] text-sm rounded-lg"
+        >
+          {{ successMessage }}
+        </div>
+        <div
+          v-if="isUploadingImage || isUploadingAudio || isUploadingVideo"
+          class="flex items-center gap-2 px-4 py-3 bg-[#f8faff] border border-[#d8dfee] text-[#5d6989] text-sm rounded-lg"
+        >
+          <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
           {{ isUploadingImage ? '图片上传中...' : '' }}
           {{ isUploadingAudio ? '音频上传中...' : '' }}
           {{ isUploadingVideo ? '视频上传中...' : '' }}
-        </p>
-        <div class="upload-result" v-if="form.imageUrl || form.audioUrl || form.videoUrl || getSanitizedImageUrls().length > 0">
-          <div v-if="getSanitizedImageUrls().length > 0" class="media-block">
-            <p class="hint">图片（{{ getSanitizedImageUrls().length }} 张）</p>
-            <div class="media-list">
-              <div v-for="(url, index) in getSanitizedImageUrls()" :key="`${url}-${index}`" class="media-item">
-                <img class="media-preview" :src="url" alt="" />
-                <span class="hint media-url">{{ url }}</span>
-                <button type="button" class="danger-button" @click="removeImageAt(index)">删除</button>
+        </div>
+
+        <!-- Uploaded Media Previews -->
+        <div v-if="form.imageUrl || form.audioUrl || form.videoUrl || getSanitizedImageUrls().length > 0" class="flex flex-col gap-4 p-4 bg-[#f8faff] border border-[#d8dfee] rounded-xl">
+          <!-- Image previews -->
+          <div v-if="getSanitizedImageUrls().length > 0" class="flex flex-col gap-3">
+            <p class="text-sm font-medium text-[#4a597f] m-0">图片（{{ getSanitizedImageUrls().length }} 张）</p>
+            <div class="flex flex-col gap-2">
+              <div
+                v-for="(url, index) in getSanitizedImageUrls()"
+                :key="`${url}-${index}`"
+                class="flex items-center gap-3 bg-white rounded-lg border border-[#e5eaf4] p-2.5"
+              >
+                <img class="w-12 h-12 rounded-lg object-cover border border-[#d4dbeb] flex-shrink-0" :src="url" alt="" />
+                <span class="flex-1 text-xs text-[#5d6989] truncate font-mono">{{ url }}</span>
+                <button
+                  type="button"
+                  class="px-3 py-1.5 text-xs font-medium text-[#c43e3e] bg-white border border-[#e5b8b8] rounded-md hover:bg-[#fef2f2] transition-colors cursor-pointer flex-shrink-0"
+                  @click="removeImageAt(index)"
+                >删除</button>
               </div>
             </div>
           </div>
-          <div v-if="form.audioUrl" class="media-block">
-            <p class="hint">音频</p>
-            <div class="media-preview-row">
-              <audio :src="form.audioUrl" controls class="audio-player"></audio>
-              <button type="button" class="danger-button" @click="clearAudio">删除</button>
+
+          <!-- Audio preview -->
+          <div v-if="form.audioUrl" class="flex flex-col gap-2">
+            <p class="text-sm font-medium text-[#4a597f] m-0">音频</p>
+            <div class="flex items-center gap-3 bg-white rounded-lg border border-[#e5eaf4] p-3">
+              <audio :src="form.audioUrl" controls class="max-w-[320px] h-9"></audio>
+              <button
+                type="button"
+                class="px-3 py-1.5 text-xs font-medium text-[#c43e3e] bg-white border border-[#e5b8b8] rounded-md hover:bg-[#fef2f2] transition-colors cursor-pointer flex-shrink-0"
+                @click="clearAudio"
+              >删除</button>
             </div>
           </div>
-          <div v-if="form.videoUrl" class="media-block">
-            <p class="hint">视频</p>
-            <div class="media-preview-row">
-              <video :src="form.videoUrl" controls class="video-player"></video>
-              <button type="button" class="danger-button" @click="clearVideo">删除</button>
+
+          <!-- Video preview -->
+          <div v-if="form.videoUrl" class="flex flex-col gap-2">
+            <p class="text-sm font-medium text-[#4a597f] m-0">视频</p>
+            <div class="flex items-center gap-3 bg-white rounded-lg border border-[#e5eaf4] p-3">
+              <video :src="form.videoUrl" controls class="max-w-full max-h-60 rounded-lg"></video>
+              <button
+                type="button"
+                class="px-3 py-1.5 text-xs font-medium text-[#c43e3e] bg-white border border-[#e5b8b8] rounded-md hover:bg-[#fef2f2] transition-colors cursor-pointer flex-shrink-0"
+                @click="clearVideo"
+              >删除</button>
             </div>
           </div>
         </div>
 
-        <div class="footer">
-          <RouterLink :to="{ name: 'PublishMemoryList' }">取消</RouterLink>
-          <button type="submit" :disabled="submitting">
-            {{
-              submitting
-                ? '保存中...'
-                : isEditMode
-                  ? '保存修改'
-                  : '确定新增'
-            }}
+        <!-- Footer Actions -->
+        <div class="flex items-center justify-between pt-3 border-t border-[#ecf0f8] mt-2">
+          <RouterLink
+            :to="{ name: 'PublishMemoryList' }"
+            class="px-4 py-2 text-sm font-medium text-[#6b7280] bg-white border border-[#d1d5db] rounded-lg hover:bg-[#f9fafb] transition-colors no-underline"
+          >
+            取消
+          </RouterLink>
+          <button
+            type="submit"
+            :disabled="submitting"
+            class="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium text-white bg-[#243b76] border border-[#243b76] rounded-lg hover:bg-[#1a2d5e] transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
+          >
+            <svg v-if="submitting" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            {{ submitting ? '保存中...' : isEditMode ? '保存修改' : '确定新增' }}
           </button>
         </div>
       </form>
 
-      <aside class="preview-panel">
-        <div class="preview-head">
-          <h3>预览面板</h3>
-          <button type="button" @click="openCurrentDetailPreview">预览详情</button>
+      <!-- ============ Preview Panel ============ -->
+      <aside class="bg-white border border-[#d8e0f1] rounded-xl p-4 md:p-5 flex flex-col gap-4 shadow-sm lg:sticky lg:top-4">
+        <div class="flex items-center justify-between gap-3">
+          <h3 class="text-sm font-semibold text-[#2a3a63] m-0">预览面板</h3>
+          <button
+            type="button"
+            class="px-3 py-1.5 text-xs font-medium text-white bg-[#243b76] rounded-lg hover:bg-[#1a2d5e] transition-colors cursor-pointer"
+            @click="openCurrentDetailPreview"
+          >
+            预览详情
+          </button>
         </div>
-        <p class="hint">点击星球节点可打开对应详情。</p>
-        <p v-if="previewErrorMessage" class="error">{{ previewErrorMessage }}</p>
-        <div class="planet-preview">
+
+        <p class="text-xs text-[#5d6989] m-0">点击星球节点可打开对应详情。</p>
+
+        <div
+          v-if="previewErrorMessage"
+          class="px-3 py-2 bg-[#fef2f2] border border-[#fecaca] text-[#b72929] text-xs rounded-lg"
+        >
+          {{ previewErrorMessage }}
+        </div>
+
+        <div class="relative h-[400px] rounded-xl overflow-hidden border border-[#d5deef] bg-[#020611]">
           <MemoryPlanet
             phase="exploring"
             :memories="previewPlanetMemories"
@@ -557,276 +716,11 @@ onMounted(async () => {
       </aside>
     </div>
 
+    <!-- Memory Detail Overlay -->
     <MemoryDetail
       v-if="previewDetailMemory"
       :memory="previewDetailMemory"
       @close="previewDetailMemory = null"
     />
-  </section>
+  </div>
 </template>
-
-<style scoped>
-.panel {
-  background: #fff;
-  border: 1px solid #d5ddee;
-  border-radius: 0.8rem;
-  padding: 1rem;
-}
-
-.layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 1fr);
-  gap: 1rem;
-  align-items: start;
-}
-
-.form {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.7rem;
-}
-
-.row > label {
-  min-width: 0;
-}
-
-.upload-row {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.7rem;
-}
-
-.upload-field {
-  display: grid;
-  gap: 0.35rem;
-  min-width: 0;
-  font-size: 0.9rem;
-}
-
-label {
-  display: grid;
-  gap: 0.35rem;
-  font-size: 0.9rem;
-}
-
-input,
-select,
-textarea {
-  border: 1px solid #ccd5e8;
-  border-radius: 0.5rem;
-  padding: 0.48rem 0.6rem;
-  font-size: 0.92rem;
-  font-family: inherit;
-}
-
-textarea {
-  resize: vertical;
-}
-
-.upload-field input[type='file'] {
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-  padding: 0.4rem 0.5rem;
-  font-size: 0.82rem;
-}
-
-.file-input-wrap {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-}
-
-.file-input-wrap input[type='file'] {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.file-input-label {
-  cursor: pointer;
-}
-
-.file-input-btn {
-  display: inline-block;
-  border: none;
-  border-radius: 0.5rem;
-  background: #243b76;
-  color: #fff;
-  padding: 0.45rem 0.75rem;
-  cursor: pointer;
-  font-size: 0.9rem;
-}
-
-.file-input-text {
-  font-size: 0.85rem;
-  color: #5d6989;
-}
-
-.advanced {
-  border: 1px dashed #b9c5df;
-  border-radius: 0.6rem;
-  padding: 0.7rem;
-  margin: 0;
-  display: grid;
-  gap: 0.6rem;
-}
-
-.advanced legend {
-  padding: 0 0.35rem;
-  color: #4a597f;
-}
-
-.footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.preview-panel {
-  border: 1px solid #d8e0f1;
-  border-radius: 0.7rem;
-  padding: 0.7rem;
-  background: #f9fbff;
-  display: grid;
-  gap: 0.55rem;
-}
-
-.preview-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.6rem;
-}
-
-.preview-head h3 {
-  margin: 0;
-  font-size: 0.98rem;
-  color: #2a3a63;
-}
-
-.planet-preview {
-  position: relative;
-  height: 400px;
-  border-radius: 0.6rem;
-  overflow: hidden;
-  border: 1px solid #d5deef;
-  background: #020611;
-}
-
-button {
-  border: none;
-  border-radius: 0.5rem;
-  background: #243b76;
-  color: #fff;
-  padding: 0.45rem 0.75rem;
-  cursor: pointer;
-}
-
-.danger-button {
-  background: #8e2f2f;
-}
-
-button:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-.error {
-  margin: 0;
-  color: #b72929;
-}
-
-.success {
-  margin: 0;
-  color: #1e7a35;
-}
-
-.hint {
-  margin: 0;
-  color: #5d6989;
-  font-size: 0.9rem;
-}
-
-.upload-result {
-  display: grid;
-  gap: 0.6rem;
-}
-
-.upload-result .hint {
-  word-break: break-all;
-}
-
-.media-block {
-  display: grid;
-  gap: 0.4rem;
-}
-
-.media-list {
-  display: grid;
-  gap: 0.35rem;
-}
-
-.media-item {
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.media-preview {
-  width: 48px;
-  height: 48px;
-  border-radius: 0.4rem;
-  object-fit: cover;
-  border: 1px solid #d4dbeb;
-}
-
-.media-preview-row {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-}
-
-.audio-player {
-  max-width: 320px;
-  height: 36px;
-}
-
-.video-player {
-  max-width: 100%;
-  max-height: 240px;
-  border-radius: 0.4rem;
-}
-
-.media-url {
-  line-height: 1.3;
-}
-
-.field-label {
-  font-size: 0.9rem;
-}
-
-.required {
-  margin-left: 0.15rem;
-  color: #b72929;
-}
-
-@media (max-width: 780px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-
-  .row {
-    grid-template-columns: 1fr;
-  }
-}
-</style>
