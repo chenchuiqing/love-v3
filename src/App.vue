@@ -9,6 +9,7 @@ import UserProfileDropdown from './components/UserProfileDropdown.vue';
 
 const route = useRoute()
 const isPublishRoute = computed(() => route.path.startsWith('/publish'))
+const isLoginRoute = computed(() => route.path === '/login')
 
 const currentPhase = ref(1);
 const phaseTwoResume = ref(false);
@@ -167,7 +168,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <RouterView v-if="isPublishRoute" />
+  <RouterView v-if="isPublishRoute || isLoginRoute" />
 
   <template v-else>
     <!--

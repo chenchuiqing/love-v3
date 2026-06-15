@@ -9,6 +9,7 @@ import FloatingMusicPlayer from './components/FloatingMusicPlayer.vue';
 import NotificationBell from './components/NotificationBell.vue';
 const route = useRoute();
 const isPublishRoute = computed(() => route.path.startsWith('/publish'));
+const isLoginRoute = computed(() => route.path === '/login');
 const currentPhase = ref(1);
 const phaseTwoResume = ref(false);
 const visitedMemoryIds = ref(new Set());

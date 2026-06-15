@@ -7,7 +7,18 @@ const router = createRouter({
     {
       path: '/',
       name: 'Home',
-      component: () => import('../views/Home.vue')
+      component: () => import('../views/Home.vue'),
+      meta: {
+        requiresUserAuth: true,
+      },
+    },
+    {
+      path: '/login',
+      name: 'Login',
+      component: () => import('@/views/LoginPage.vue'),
+      meta: {
+        guestOnly: true,
+      },
     },
     {
       path: '/publish/login',
@@ -59,16 +70,16 @@ router.beforeEach(async (to) => {
   const user = await checkUserSession()
 
   if (requiresUserAuth && !user) {
+    const loginRoute = to.path.startsWith('/publish') ? 'PublishLogin' : 'Login'
     return {
-      name: 'PublishLogin',
+      name: loginRoute,
       query: { redirect: to.fullPath },
     }
   }
 
   if (guestOnly && user) {
-    return {
-      name: 'PublishMemoryList',
-    }
+    const homeRoute = to.path.startsWith('/publish') ? 'PublishMemoryList' : 'Home'
+    return { name: homeRoute }
   }
 
   return true
