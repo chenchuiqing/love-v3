@@ -422,7 +422,7 @@ onUnmounted(() => {
             <input
               v-model.trim="form.title"
               required
-              class="border border-[#ccd5e8] rounded-lg px-3.5 py-2.5 text-sm text-[#1d2433] font-normal placeholder:text-[#b0bdd4] focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
+              class="border border-[#ccd5e8] rounded-lg px-3.5 py-2.5 text-base md:text-sm text-[#1d2433] font-normal placeholder:text-[#b0bdd4] focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
             />
           </label>
 
@@ -431,7 +431,7 @@ onUnmounted(() => {
               类型
               <select
                 v-model="form.type"
-                class="border border-[#ccd5e8] rounded-lg px-3.5 py-2.5 text-sm text-[#1d2433] font-normal bg-white focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
+                class="border border-[#ccd5e8] rounded-lg px-3.5 py-2.5 text-base md:text-sm text-[#1d2433] font-normal bg-white focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
               >
                 <option
                   v-for="item in memoryTypeOptions"
@@ -449,7 +449,7 @@ onUnmounted(() => {
                 v-model.trim="form.date"
                 required
                 placeholder="例如 2026.05.09"
-                class="border border-[#ccd5e8] rounded-lg px-3.5 py-2.5 text-sm text-[#1d2433] font-normal placeholder:text-[#b0bdd4] focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
+                class="border border-[#ccd5e8] rounded-lg px-3.5 py-2.5 text-base md:text-sm text-[#1d2433] font-normal placeholder:text-[#b0bdd4] focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
               />
             </label>
           </div>
@@ -465,7 +465,7 @@ onUnmounted(() => {
                 />
                 <input
                   v-model.trim="form.color"
-                  class="flex-1 border border-[#ccd5e8] rounded-lg px-3.5 py-2.5 text-sm text-[#1d2433] font-mono font-normal focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
+                  class="flex-1 border border-[#ccd5e8] rounded-lg px-3.5 py-2.5 text-base md:text-sm text-[#1d2433] font-mono font-normal focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
                 />
               </div>
             </label>
@@ -474,7 +474,7 @@ onUnmounted(() => {
               粒子主题
               <select
                 v-model="form.theme"
-                class="border border-[#ccd5e8] rounded-lg px-3.5 py-2.5 text-sm text-[#1d2433] font-normal bg-white focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
+                class="border border-[#ccd5e8] rounded-lg px-3.5 py-2.5 text-base md:text-sm text-[#1d2433] font-normal bg-white focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
               >
                 <option
                   v-for="item in particleThemeOptions"
@@ -497,7 +497,7 @@ onUnmounted(() => {
             <textarea
               v-model.trim="form.text"
               rows="4"
-              class="border border-[#ccd5e8] rounded-lg px-3.5 py-2.5 text-sm text-[#1d2433] font-normal resize-y placeholder:text-[#b0bdd4] focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
+              class="border border-[#ccd5e8] rounded-lg px-3.5 py-2.5 text-base md:text-sm text-[#1d2433] font-normal resize-y placeholder:text-[#b0bdd4] focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
             ></textarea>
           </label>
 
@@ -505,7 +505,7 @@ onUnmounted(() => {
             地点
             <input
               v-model.trim="form.location"
-              class="border border-[#ccd5e8] rounded-lg px-3.5 py-2.5 text-sm text-[#1d2433] font-normal placeholder:text-[#b0bdd4] focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
+              class="border border-[#ccd5e8] rounded-lg px-3.5 py-2.5 text-base md:text-sm text-[#1d2433] font-normal placeholder:text-[#b0bdd4] focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
             />
           </label>
         </div>
@@ -573,7 +573,7 @@ onUnmounted(() => {
                 v-model.number="form.theta"
                 type="number"
                 step="0.0001"
-                class="border border-[#ccd5e8] rounded-lg px-3 py-2 text-sm text-[#1d2433] font-mono font-normal focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
+                class="border border-[#ccd5e8] rounded-lg px-3 py-2 text-base md:text-sm text-[#1d2433] font-mono font-normal focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
               />
             </label>
             <label class="flex flex-col gap-1 text-xs font-medium text-[#5a6377]">
@@ -582,7 +582,7 @@ onUnmounted(() => {
                 v-model.number="form.phi"
                 type="number"
                 step="0.0001"
-                class="border border-[#ccd5e8] rounded-lg px-3 py-2 text-sm text-[#1d2433] font-mono font-normal focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
+                class="border border-[#ccd5e8] rounded-lg px-3 py-2 text-base md:text-sm text-[#1d2433] font-mono font-normal focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
               />
             </label>
             <label class="flex flex-col gap-1 text-xs font-medium text-[#5a6377]">
@@ -591,7 +591,7 @@ onUnmounted(() => {
                 v-model.number="form.orbitRadius"
                 type="number"
                 step="0.0001"
-                class="border border-[#ccd5e8] rounded-lg px-3 py-2 text-sm text-[#1d2433] font-mono font-normal focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
+                class="border border-[#ccd5e8] rounded-lg px-3 py-2 text-base md:text-sm text-[#1d2433] font-mono font-normal focus:outline-none focus:border-[#243b76] focus:ring-1 focus:ring-[#243b76]/20 transition-colors"
               />
             </label>
           </div>
@@ -753,7 +753,7 @@ onUnmounted(() => {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
             </svg>
           </span>
-          <span class="text-sm text-[#1d2433]">{{ successMessage }}</span>
+          <span class="text-base md:text-sm text-[#1d2433]">{{ successMessage }}</span>
         </div>
       </Transition>
     </Teleport>
