@@ -106,6 +106,7 @@ let animationId: number
 let particlesMesh: THREE.Points
 let particlePositions: Float32Array
 let particleOriginalPositions: Float32Array
+let typewriterInterval: ReturnType<typeof setInterval> | null = null
 
 const PARTICLE_COUNT = 8000
 
@@ -280,16 +281,20 @@ const animateParticles = () => {
 }
 
 const startTypewriter = () => {
+  if (typewriterInterval) clearInterval(typewriterInterval)
   const text = props.memory.content.text || ''
   let index = 0
   displayedText.value = ''
 
-  const typeInterval = setInterval(() => {
+  typewriterInterval = setInterval(() => {
     if (index < text.length) {
       displayedText.value += text[index]
       index++
     } else {
-      clearInterval(typeInterval)
+      if (typewriterInterval) {
+        clearInterval(typewriterInterval)
+        typewriterInterval = null
+      }
     }
   }, 80)
 }
@@ -371,7 +376,11 @@ watch(() => props.scrollToCommentId, (newCommentId) => {
   }
 })
 
-watch(() => props.memory, () => {
+watch(() => props.memory, (newMem, oldMem) => {
+  // Skip restarting typewriter if only the theme changed
+  if (oldMem && newMem.id === oldMem.id && newMem.content.text === oldMem.content.text) {
+    return
+  }
   displayedText.value = ''
   isImageLoaded.value = false
   isPortraitImage.value = false
@@ -404,6 +413,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   cancelAnimationFrame(animationId)
+  if (typewriterInterval) clearInterval(typewriterInterval)
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('keydown', handleExpandKeydown)
   document.body.style.overflow = ''
@@ -423,23 +433,21 @@ onUnmounted(() => {
     <canvas ref="canvasRef" class="particle-canvas" />
 
     <!-- Theme selector (only shown in admin preview mode) -->
-    <div v-if="showThemeSelector" class="theme-selector">
-      <label class="theme-selector-label">
-        <span class="theme-selector-text">粒子主题</span>
-        <select
-          :value="memory.content.theme"
-          class="theme-selector-dropdown"
-          @change="handleThemeChange"
+    <div v-if="showThemeSelector" class="absolute top-4 right-4 z-20 flex items-center gap-2.5 rounded-xl border border-white/20 bg-[#0c1423]/75 backdrop-blur-xl px-4 py-2.5">
+      <span class="text-xs font-medium text-white/75 whitespace-nowrap">粒子主题</span>
+      <select
+        :value="memory.content.theme"
+        class="theme-preview-select appearance-none rounded-md border border-white/25 bg-white/10 pl-2 pr-6 py-1 text-xs text-white/90 cursor-pointer hover:border-white/45 hover:bg-white/15 focus:outline-none focus:border-white/55 focus:ring-2 focus:ring-white/10 transition-colors"
+        @change="handleThemeChange"
+      >
+        <option
+          v-for="opt in particleThemeOptions"
+          :key="opt.value"
+          :value="opt.value"
         >
-          <option
-            v-for="opt in particleThemeOptions"
-            :key="opt.value"
-            :value="opt.value"
-          >
-            {{ opt.label }}
-          </option>
-        </select>
-      </label>
+          {{ opt.label }}
+        </option>
+      </select>
     </div>
 
     <div class="content-wrapper">
@@ -884,61 +892,14 @@ onUnmounted(() => {
   color: rgba(255, 255, 255, 0.9);
 }
 
-/* Theme selector - floating panel in admin preview */
-.theme-selector {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  z-index: 20;
-  background: rgba(12, 20, 35, 0.75);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 0.75rem;
-  padding: 0.65rem 1rem;
-}
-
-.theme-selector-label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-}
-
-.theme-selector-text {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.75);
-  white-space: nowrap;
-  font-weight: 500;
-}
-
-.theme-selector-dropdown {
-  appearance: none;
-  -webkit-appearance: none;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 0.4rem;
-  padding: 0.35rem 2rem 0.35rem 0.6rem;
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.9);
-  cursor: pointer;
+/* Theme preview select — custom arrow & option colors Tailwind cannot express */
+.theme-preview-select {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.7)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 0.4rem center;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  background-position: right 0.35rem center;
 }
 
-.theme-selector-dropdown:hover {
-  border-color: rgba(255, 255, 255, 0.45);
-  background-color: rgba(255, 255, 255, 0.15);
-}
-
-.theme-selector-dropdown:focus {
-  outline: none;
-  border-color: rgba(255, 255, 255, 0.55);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
-}
-
-.theme-selector-dropdown option {
+.theme-preview-select option {
   background: #1a2035;
   color: rgba(255, 255, 255, 0.9);
 }
