@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import * as THREE from 'three'
-import type { Memory } from '@/types/memory'
+import type { Memory, ParticleTheme } from '@/types/memory'
 import { useMusicPlayerStore } from '@/stores/musicPlayer'
 import { AnimatePresence, Motion } from 'motion-v'
 import { Icon } from '@iconify/vue'
@@ -11,10 +11,12 @@ import CommentSection from '@/components/CommentSection.vue'
 const props = defineProps<{
   memory: Memory
   scrollToCommentId?: string | null
+  showThemeSelector?: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'close'): void
+  (e: 'update:theme', theme: ParticleTheme): void
 }>()
 
 const containerRef = ref<HTMLElement | null>(null)
@@ -82,6 +84,21 @@ const mediaCards = computed<MediaCardItem[]>(() => {
 
 const shouldUseSingleImageLayout = computed(() => mediaImages.value.length === 1 && !props.memory.content.videoUrl)
 
+const particleThemeOptions: { value: ParticleTheme; label: string }[] = [
+  { value: 'default', label: '默认' },
+  { value: 'ocean', label: '海洋' },
+  { value: 'forest', label: '森林' },
+  { value: 'city', label: '城市' },
+  { value: 'sky', label: '晴空' },
+  { value: 'summit', label: '山野登山' },
+  { value: 'sunshine', label: '暖阳' },
+  { value: 'meadow', label: '草地春光' },
+  { value: 'night', label: '夜景' },
+  { value: 'fireworks', label: '烟花' },
+  { value: 'moonlight', label: '月光' },
+  { value: 'neon', label: '霓虹' },
+]
+
 let scene: THREE.Scene
 let camera: THREE.PerspectiveCamera
 let renderer: THREE.WebGLRenderer
@@ -137,6 +154,32 @@ const createParticleTexture = (): THREE.CanvasTexture => {
   ctx.fillRect(0, 0, 32, 32)
 
   return new THREE.CanvasTexture(canvas)
+}
+
+const updateParticleColors = () => {
+  if (!scene || !particlesMesh) return
+
+  const colors = themeColors.value
+  scene.background = new THREE.Color(colors.primary)
+
+  const accentColor = new THREE.Color(colors.accent)
+  const secondaryColor = new THREE.Color(colors.secondary)
+  const colorAttr = particlesMesh.geometry.attributes.color as THREE.BufferAttribute
+
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    const mixRatio = Math.random()
+    const mixedColor = accentColor.clone().lerp(secondaryColor, mixRatio)
+    colorAttr.array[i * 3] = mixedColor.r
+    colorAttr.array[i * 3 + 1] = mixedColor.g
+    colorAttr.array[i * 3 + 2] = mixedColor.b
+  }
+  colorAttr.needsUpdate = true
+}
+
+const handleThemeChange = (event: Event) => {
+  const select = event.target as HTMLSelectElement
+  const newTheme = select.value as ParticleTheme
+  emit('update:theme', newTheme)
 }
 
 const initParticleBackground = () => {
@@ -338,6 +381,13 @@ watch(() => props.memory, () => {
   }, 500)
 }, { immediate: false })
 
+// Watch for theme changes from parent and update particle colors in real-time
+watch(() => props.memory.content.theme, (newTheme) => {
+  if (newTheme && scene) {
+    updateParticleColors()
+  }
+})
+
 onMounted(() => {
   initParticleBackground()
   window.addEventListener('resize', handleResize)
@@ -371,6 +421,26 @@ onUnmounted(() => {
 <template>
   <div ref="containerRef" class="memory-detail">
     <canvas ref="canvasRef" class="particle-canvas" />
+
+    <!-- Theme selector (only shown in admin preview mode) -->
+    <div v-if="showThemeSelector" class="theme-selector">
+      <label class="theme-selector-label">
+        <span class="theme-selector-text">粒子主题</span>
+        <select
+          :value="memory.content.theme"
+          class="theme-selector-dropdown"
+          @change="handleThemeChange"
+        >
+          <option
+            v-for="opt in particleThemeOptions"
+            :key="opt.value"
+            :value="opt.value"
+          >
+            {{ opt.label }}
+          </option>
+        </select>
+      </label>
+    </div>
 
     <div class="content-wrapper">
       <div class="date-badge">
@@ -811,6 +881,65 @@ onUnmounted(() => {
 .image-expand-hint-icon {
   width: 1.1rem;
   height: 1.1rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Theme selector - floating panel in admin preview */
+.theme-selector {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 20;
+  background: rgba(12, 20, 35, 0.75);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.75rem;
+  padding: 0.65rem 1rem;
+}
+
+.theme-selector-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.theme-selector-text {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.75);
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.theme-selector-dropdown {
+  appearance: none;
+  -webkit-appearance: none;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 0.4rem;
+  padding: 0.35rem 2rem 0.35rem 0.6rem;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.7)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.4rem center;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.theme-selector-dropdown:hover {
+  border-color: rgba(255, 255, 255, 0.45);
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.theme-selector-dropdown:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
+}
+
+.theme-selector-dropdown option {
+  background: #1a2035;
   color: rgba(255, 255, 255, 0.9);
 }
 </style>

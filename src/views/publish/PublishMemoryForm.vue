@@ -371,6 +371,16 @@ const openCurrentDetailPreview = () => {
   previewDetailMemory.value = previewFormMemory.value
 }
 
+const handlePreviewThemeChange = (theme: ParticleTheme) => {
+  form.theme = theme
+  if (previewDetailMemory.value) {
+    previewDetailMemory.value = {
+      ...previewDetailMemory.value,
+      content: { ...previewDetailMemory.value.content, theme },
+    }
+  }
+}
+
 onMounted(async () => {
   await loadPreviewCatalog()
 
@@ -737,7 +747,9 @@ onUnmounted(() => {
     <MemoryDetail
       v-if="previewDetailMemory"
       :memory="previewDetailMemory"
+      :show-theme-selector="true"
       @close="previewDetailMemory = null"
+      @update:theme="handlePreviewThemeChange"
     />
 
     <!-- Success Toast -->
