@@ -52,7 +52,7 @@ watch(open, (newVal) => {
   if (newVal) {
     document.body.style.overflow = "hidden";
   } else {
-    document.body.style.overflow = "auto";
+    document.body.style.overflow = "";
   }
 });
 
@@ -73,7 +73,7 @@ function handleClose() {
     <AnimatePresence>
       <div
         v-if="open"
-        class="fixed inset-0 z-50 h-screen overflow-auto"
+        class="fixed inset-0 z-50 overflow-auto pb-[env(safe-area-inset-bottom,0px)]"
       >
         <Motion
           as="div"

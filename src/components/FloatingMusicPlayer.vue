@@ -166,7 +166,7 @@ const waveBars = [0, 1, 2, 3, 4]
 .floating-player {
   position: fixed;
   left: 50%;
-  bottom: 1.75rem;
+  bottom: max(1.75rem, calc(env(safe-area-inset-bottom, 0px) + 0.75rem));
   transform: translateX(-50%);
   z-index: 9000;
   pointer-events: none;
@@ -608,7 +608,7 @@ const waveBars = [0, 1, 2, 3, 4]
 @media (max-width: 540px) {
   .floating-player.is-collapsed {
     right: 0.75rem;
-    bottom: 1.25rem;
+    bottom: max(1.25rem, calc(env(safe-area-inset-bottom, 0px) + 0.5rem));
   }
 
   .player-card:not(.is-collapsed) {

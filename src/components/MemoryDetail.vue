@@ -555,7 +555,7 @@ onUnmounted(() => {
 
     <Teleport to="body">
       <AnimatePresence>
-        <div v-if="isImageExpanded" class="fixed inset-0 z-[9999] overflow-auto" @click="closeImageExpand">
+        <div v-if="isImageExpanded" class="fixed inset-0 z-[9999] overflow-auto pb-[env(safe-area-inset-bottom,0px)]" @click="closeImageExpand">
           <Motion
             :initial="{ opacity: 0 }"
             :animate="{ opacity: 1 }"
@@ -619,6 +619,7 @@ onUnmounted(() => {
   max-height: 100dvh;
   box-sizing: border-box;
   padding: 2rem;
+  padding-bottom: max(2rem, env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -642,6 +643,7 @@ onUnmounted(() => {
   .content-wrapper {
     width: 100%;
     padding: 1.25rem 1rem 1.5rem;
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom, 0px));
     gap: 1rem;
   }
 

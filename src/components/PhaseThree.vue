@@ -1854,12 +1854,14 @@ onUnmounted(() => {
   background: radial-gradient(circle at 50% 50%, rgba(15, 5, 25, 0.55) 0%, rgba(0, 0, 16, 0.78) 80%);
   z-index: 10;
   padding: 1.5rem;
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom, 0px));
 }
 
 .letter-card {
   width: min(420px, 88vw);
   max-height: min(78vh, 640px);
   padding: 2rem 1.8rem;
+  padding-bottom: max(2rem, calc(env(safe-area-inset-bottom, 0px) + 1rem));
   border-radius: 16px;
   background: linear-gradient(155deg, rgba(252, 244, 228, 0.96), rgba(244, 228, 208, 0.92));
   color: #5a3a2a;
