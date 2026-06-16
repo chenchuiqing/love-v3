@@ -106,229 +106,95 @@ defineExpose({ loadComments, isCollapsed, expand })
 </script>
 
 <template>
-  <div class="comment-section">
-    <button class="section-header" @click="toggleCollapse">
-      <span class="collapse-arrow" :class="{ collapsed: isCollapsed }">▾</span>
-      <span class="section-title">回忆对话</span>
-      <span class="comment-count">{{ comments.length }} 条</span>
+  <div class="w-full pt-4 border-t border-white/10">
+    <button
+      class="flex items-center gap-1.5 mb-3 w-full p-0 border-none bg-transparent text-inherit cursor-pointer font-inherit group"
+      @click="toggleCollapse"
+    >
+      <span
+        class="text-xs text-white/40 leading-none transition-transform duration-250 ease-out"
+        :class="{ 'rotate-[-90deg]': isCollapsed }"
+      >▾</span>
+      <span class="text-[0.95rem] font-semibold text-white/90 group-hover:text-white transition-colors duration-200">
+        回忆对话
+      </span>
+      <span class="text-xs text-white/50">{{ comments.length }} 条</span>
     </button>
 
-    <div v-if="!isCollapsed" class="section-body">
+    <div v-if="!isCollapsed" class="flex flex-col gap-3">
+      <!-- Loading -->
+      <div v-if="loading" class="text-center py-6 text-white/40 text-[0.85rem]">
+        加载中...
+      </div>
 
-    <div v-if="loading" class="loading-hint">加载中...</div>
+      <!-- Empty -->
+      <div v-else-if="comments.length === 0" class="text-center py-6 text-white/40 text-[0.85rem]">
+        还没有评论，留下第一条回忆对话吧
+      </div>
 
-    <div v-else-if="comments.length === 0" class="empty-hint">
-      还没有评论，留下第一条回忆对话吧
-    </div>
+      <!-- Comment List -->
+      <div v-else class="flex flex-col gap-3 max-h-[40vh] overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <CommentNode
+          v-for="comment in comments"
+          :key="comment.id"
+          :comment="comment"
+          :depth="0"
+          :current-user-id="currentUserId"
+          @delete="handleDelete"
+          @reply="startReply"
+        />
+      </div>
 
-    <div v-else class="comment-list">
-      <CommentNode
-        v-for="comment in comments"
-        :key="comment.id"
-        :comment="comment"
-        :depth="0"
-        :current-user-id="currentUserId"
-        @delete="handleDelete"
-        @reply="startReply"
+      <!-- Reply Indicator -->
+      <div v-if="replyTarget" class="flex items-center gap-1.5 py-2 text-xs text-white/50">
+        回复 {{ displayName(replyTarget) }}：
+        <span class="text-white/35 max-w-[150px] overflow-hidden text-ellipsis whitespace-nowrap">
+          {{ replyTarget.content.slice(0, 30) }}{{ replyTarget.content.length > 30 ? '...' : '' }}
+        </span>
+        <button class="text-xs text-white/40 bg-transparent border-none cursor-pointer p-0" @click="cancelReply">
+          取消
+        </button>
+      </div>
+
+      <!-- Input Area (logged in) -->
+      <div v-if="isLoggedIn" class="flex gap-2 mt-3 items-end">
+        <textarea
+          v-model="inputText"
+          class="flex-1 border border-white/15 rounded-lg px-2.5 py-2 text-base text-white bg-white/[0.06] resize-y min-h-[56px] font-inherit placeholder:text-white/25 focus:outline-none focus:border-white/30 transition-colors [scrollbar-width:thin] [scrollbar-color:rgb(255,255,255,0.12)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/12 hover:[&::-webkit-scrollbar-thumb]:bg-white/20"
+          :placeholder="replyTarget ? '写下回复...' : '写下你的回忆对话...'"
+          rows="2"
+          @keydown.ctrl.enter="handleSubmit"
+        ></textarea>
+        <button
+          class="px-4 py-2 border-none rounded-lg bg-white/[0.15] text-white/90 text-[0.85rem] cursor-pointer whitespace-nowrap font-inherit transition-colors hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+          :disabled="!inputText.trim() || submitting"
+          @click="handleSubmit"
+        >
+          {{ submitting ? '发送中...' : '发送' }}
+        </button>
+      </div>
+
+      <!-- Login Prompt -->
+      <div v-else class="text-center mt-3">
+        <button
+          class="px-5 py-2.5 border border-white/20 rounded-lg bg-white/[0.06] text-white/70 text-[0.85rem] cursor-pointer font-inherit transition-all duration-200 hover:bg-white/10 hover:border-white/35 hover:text-white/90"
+          @click="showLoginDialog = true"
+        >
+          登录后参与回忆对话
+        </button>
+      </div>
+
+      <UserLoginDialog
+        v-if="showLoginDialog"
+        @close="showLoginDialog = false"
+        @login-success="handleLoginSuccess"
       />
-    </div>
-
-    <div v-if="replyTarget" class="reply-indicator">
-      回复 {{ displayName(replyTarget) }}：
-      <span class="reply-preview">{{ replyTarget.content.slice(0, 30) }}{{ replyTarget.content.length > 30 ? '...' : '' }}</span>
-      <button class="cancel-reply" @click="cancelReply">取消</button>
-    </div>
-
-    <div v-if="isLoggedIn" class="input-area">
-      <textarea
-        v-model="inputText"
-        class="comment-input"
-        :placeholder="replyTarget ? '写下回复...' : '写下你的回忆对话...'"
-        rows="2"
-        @keydown.ctrl.enter="handleSubmit"
-      ></textarea>
-      <button class="send-btn" :disabled="!inputText.trim() || submitting" @click="handleSubmit">
-        {{ submitting ? '发送中...' : '发送' }}
-      </button>
-    </div>
-
-    <div v-else class="login-prompt">
-      <button class="login-btn" @click="showLoginDialog = true">登录后参与回忆对话</button>
-    </div>
-
-    <UserLoginDialog
-      v-if="showLoginDialog"
-      @close="showLoginDialog = false"
-      @login-success="handleLoginSuccess"
-    />
     </div>
   </div>
 </template>
 
-<style scoped>
-.comment-section {
-  width: 100%;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-bottom: 0.75rem;
-  width: 100%;
-  padding: 0;
-  border: none;
-  background: none;
-  color: inherit;
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.section-header:hover .section-title {
-  color: rgba(255, 255, 255, 1);
-}
-
-.collapse-arrow {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.4);
-  transition: transform 0.25s ease;
-  line-height: 1;
-}
-
-.collapse-arrow.collapsed {
-  transform: rotate(-90deg);
-}
-
-.section-title {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
-  transition: color 0.2s ease;
-}
-
-.comment-count {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.loading-hint,
-.empty-hint {
-  text-align: center;
-  padding: 1.5rem 0;
-  color: rgba(255, 255, 255, 0.4);
-  font-size: 0.85rem;
-}
-
-.comment-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  max-height: 40vh;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
-}
-
-.comment-list::-webkit-scrollbar {
-  display: none;
-}
-
-.reply-indicator {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.5);
-  padding: 0.5rem 0;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.reply-preview {
-  color: rgba(255, 255, 255, 0.35);
-  max-width: 150px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cancel-reply {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.4);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-}
-
-.input-area {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-  align-items: flex-end;
-}
-
-.comment-input {
-  flex: 1;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 0.5rem;
-  padding: 0.5rem 0.6rem;
-  font-size: 0.85rem;
-  font-family: inherit;
-  background: rgba(255, 255, 255, 0.06);
-  color: white;
-  resize: none;
-}
-
-.comment-input:focus {
-  outline: none;
-  border-color: rgba(255, 255, 255, 0.3);
-}
-
-.comment-input::placeholder {
-  color: rgba(255, 255, 255, 0.25);
-}
-
-.send-btn {
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 0.5rem;
-  background: rgba(100, 180, 255, 0.25);
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 0.85rem;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.send-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.login-prompt {
-  text-align: center;
-  margin-top: 0.75rem;
-}
-
-.login-btn {
-  padding: 0.6rem 1.2rem;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 0.5rem;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.login-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.35);
-  color: rgba(255, 255, 255, 0.9);
-}
-
-/* 评论高亮效果 */
-:global(.comment-highlight) {
+<style>
+.comment-highlight {
   animation: highlight-fade 3s ease-out;
 }
 
