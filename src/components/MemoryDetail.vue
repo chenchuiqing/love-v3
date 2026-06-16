@@ -531,7 +531,7 @@ onUnmounted(() => {
       </p>
 
       <div v-if="memory.content.location" class="location-tag">
-        <span class="location-icon">📍</span>
+        <Icon icon="tabler:map-pin" class="location-icon" />
         {{ memory.content.location }}
       </div>
 
@@ -540,8 +540,12 @@ onUnmounted(() => {
           class="play-button"
           @click="toggleAudio"
         >
-          <span v-if="isCurrentPlaying">⏸</span>
-          <span v-else>▶</span>
+          <span v-if="isCurrentPlaying">
+            <Icon icon="tabler:player-pause" class="size-5" />
+          </span>
+          <span v-else>
+            <Icon icon="tabler:player-play" class="size-5" />
+          </span>
           {{ isCurrentPlaying ? '暂停' : '播放' }}
         </button>
       </div>
@@ -818,7 +822,8 @@ onUnmounted(() => {
 }
 
 .location-icon {
-  font-size: 1rem;
+  width: 1rem;
+  height: 1rem;
 }
 
 .audio-controls {
