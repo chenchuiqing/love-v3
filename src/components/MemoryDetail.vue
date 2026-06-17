@@ -192,7 +192,7 @@ const initParticleBackground = () => {
 
   camera = new THREE.PerspectiveCamera(
     60,
-    containerRef.value.clientWidth / containerRef.value.clientHeight,
+    window.innerWidth / window.innerHeight,
     0.1,
     100
   )
@@ -203,7 +203,7 @@ const initParticleBackground = () => {
     antialias: true,
     alpha: true
   })
-  renderer.setSize(containerRef.value.clientWidth, containerRef.value.clientHeight)
+  renderer.setSize(window.innerWidth, window.innerHeight)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 
   const geometry = new THREE.BufferGeometry()
@@ -337,11 +337,11 @@ const handleClose = () => {
 }
 
 const handleResize = () => {
-  if (!containerRef.value || !camera || !renderer) return
+  if (!camera || !renderer) return
 
-  camera.aspect = containerRef.value.clientWidth / containerRef.value.clientHeight
+  camera.aspect = window.innerWidth / window.innerHeight
   camera.updateProjectionMatrix()
-  renderer.setSize(containerRef.value.clientWidth, containerRef.value.clientHeight)
+  renderer.setSize(window.innerWidth, window.innerHeight)
 }
 
 const scrollToComment = (commentId: string) => {
@@ -602,13 +602,19 @@ onUnmounted(() => {
   height: 100%;
   z-index: 50;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  overflow: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.memory-detail::-webkit-scrollbar {
+  display: none;
 }
 
 .particle-canvas {
-  position: absolute;
+  position: fixed;
   inset: 0;
   width: 100%;
   height: 100%;
@@ -620,7 +626,6 @@ onUnmounted(() => {
   z-index: 10;
   max-width: 760px;
   width: 90%;
-  max-height: 100dvh;
   box-sizing: border-box;
   padding: 2rem;
   padding-bottom: max(2rem, env(safe-area-inset-bottom, 0px));
@@ -629,14 +634,8 @@ onUnmounted(() => {
   align-items: center;
   gap: 1.5rem;
   text-align: center;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-.content-wrapper::-webkit-scrollbar {
-  display: none;
+  margin-top: auto;
+  margin-bottom: auto;
 }
 
 .content-wrapper > * {

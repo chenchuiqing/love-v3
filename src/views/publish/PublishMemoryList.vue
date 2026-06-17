@@ -216,8 +216,13 @@ onMounted(() => {
           <div class="flex items-start justify-between mb-3">
             <h3 class="text-sm font-semibold text-[#1d2433] m-0 leading-relaxed">{{ item.title }}</h3>
             <div class="flex items-center gap-2.5 flex-shrink-0 ml-3">
-              <a :href="`/?memoryId=${item.id}`" class="text-xs text-[#304f9f] no-underline font-medium">预览</a>
               <RouterLink :to="{ name: 'PublishMemoryEdit', params: { id: item.id } }" class="text-xs text-[#304f9f] no-underline font-medium">编辑</RouterLink>
+              <button
+                type="button"
+                class="text-xs text-[#c43e3e] bg-transparent border-0 p-0 font-medium cursor-pointer hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                :disabled="deletingId === item.id"
+                @click="openConfirm(item.id, item.title)"
+              >删除</button>
             </div>
           </div>
 
@@ -238,14 +243,10 @@ onMounted(() => {
           </div>
 
           <div class="mt-3 pt-3 border-t border-[#ecf0f8]">
-            <button
-              type="button"
-              class="w-full px-3 py-2 text-sm font-medium text-[#c43e3e] border border-[#e5b8b8] rounded-md hover:bg-[#fef2f2] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              :disabled="deletingId === item.id"
-              @click="openConfirm(item.id, item.title)"
-            >
-              {{ deletingId === item.id ? '删除中...' : '删除' }}
-            </button>
+            <a
+              :href="`/?memoryId=${item.id}`"
+              class="flex items-center justify-center w-full px-3 py-2 text-sm font-medium text-[#304f9f] border border-[#b8c9e5] rounded-md hover:bg-[#f3f7ff] transition-colors no-underline"
+            >预览</a>
           </div>
         </div>
       </div>
